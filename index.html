@@ -1,0 +1,1651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LaneMasters ⚔️</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#04040d; color:#c8c0b0;
+  font-family:'Share Tech Mono',monospace;
+  height:100vh; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; overflow:hidden;
+}
+h1 { font-family:'Press Start 2P',monospace; font-size:2rem; color:#f0b840;
+  text-shadow:0 0 30px #f0b84080; margin-bottom:1.5rem; }
+h2 { font-family:'Press Start 2P',monospace; font-size:1rem; color:#f0b840; margin-bottom:1rem; }
+.screen { display:none; flex-direction:column; align-items:center; justify-content:center;
+  width:100%; height:100%; padding:20px; }
+.screen.active { display:flex; }
+
+input[type=text], textarea {
+  background:#0d0d20; border:1px solid #3a3a5e; color:#c8c0b0;
+  padding:10px 16px; font-family:'Share Tech Mono',monospace; font-size:.9rem;
+  border-radius:3px; outline:none; width:340px;
+}
+input:focus, textarea:focus { border-color:#f0b840; box-shadow:0 0 8px #f0b84040; }
+textarea { width:460px; height:130px; resize:none; font-size:.7rem; }
+
+button {
+  background:#0d0d20; border:1px solid #5a5a8a; color:#c8c0b0;
+  padding:10px 24px; font-family:'Share Tech Mono',monospace; font-size:.85rem;
+  border-radius:3px; cursor:pointer; transition:all .15s; text-transform:uppercase;
+  letter-spacing:1px;
+}
+button:hover { border-color:#f0b840; color:#f0b840; box-shadow:0 0 12px #f0b84030; }
+button.primary { background:#2a1a00; border-color:#f0b840; color:#f0b840; }
+button.primary:hover { background:#3a2500; box-shadow:0 0 20px #f0b84050; }
+
+.gap { gap:10px; display:flex; flex-direction:column; align-items:center; }
+.row { display:flex; gap:10px; align-items:center; }
+
+/* LOBBY */
+#lobby-status { font-size:.75rem; color:#7a7a9a; margin-top:.5rem; min-height:1.2em; }
+#room-code-display { font-family:'Press Start 2P',monospace; font-size:1.5rem;
+  color:#f0b840; letter-spacing:6px; margin:.5rem 0; }
+
+/* CHAR SELECT */
+#char-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:.8rem 0; }
+.char-card {
+  background:#0d0d20; border:2px solid #2a2a4a; border-radius:4px;
+  padding:12px 8px; cursor:pointer; transition:all .15s; text-align:center; width:130px;
+}
+.char-card:hover, .char-card.selected {
+  border-color:#f0b840; background:#1a1a2e;
+  box-shadow:0 0 12px #f0b84040;
+}
+.char-card .cicon { font-size:2rem; margin-bottom:4px; }
+.char-card .cname { font-size:.55rem; color:#f0b840; letter-spacing:1px; margin-bottom:4px; }
+.char-card .cstats { font-size:.45rem; color:#7a7a9a; line-height:1.7; }
+.char-card .cdesc { font-size:.45rem; color:#a0a0c0; margin-top:4px; font-style:italic; }
+#char-select-status { font-size:.7rem; color:#7a7a9a; margin-top:.5rem; }
+
+/* HUD */
+#hud {
+  position:fixed; top:0; left:0; right:0;
+  background:#04040dee; padding:5px 16px;
+  display:none; justify-content:space-between; align-items:center;
+  border-bottom:1px solid #2a2a4a; font-size:.65rem; z-index:10;
+}
+#hud.active { display:flex; }
+.p-hud { display:flex; align-items:center; gap:8px; }
+.hpbar-wrap { width:150px; height:12px; background:#1a1a2e; border:1px solid #3a3a5e; border-radius:2px; overflow:hidden; }
+.hpbar { height:100%; transition:width .15s; }
+.ability-row { display:flex; gap:5px; align-items:center; }
+.aslot {
+  width:38px; height:38px; background:#0d0d20; border:1px solid #3a3a5e;
+  border-radius:3px; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; font-size:.5rem; text-align:center; position:relative;
+  line-height:1.3; overflow:hidden;
+}
+.aslot .akey { position:absolute; bottom:2px; right:3px; font-size:.4rem; color:#f0b840; }
+.aslot .acool { position:absolute; inset:0; background:#04040dbb; display:flex;
+  align-items:center; justify-content:center; font-size:.6rem; color:#f0b840; }
+.aslot .acool.hidden { display:none; }
+#hud-status { font-size:.6rem; color:#f0b840; text-align:center; }
+#hud-wave { font-size:.55rem; color:#7a7a9a; }
+
+/* CANVAS */
+#game-wrap { position:relative; }
+#game-canvas { display:block; border:1px solid #1a1a3a; }
+
+/* WIN SCREEN */
+#win-overlay {
+  position:fixed; inset:0; background:#04040df0;
+  display:none; flex-direction:column; align-items:center; justify-content:center;
+  z-index:100;
+}
+#win-overlay.active { display:flex; }
+#win-msg { font-family:'Press Start 2P',monospace; font-size:2.5rem; margin-bottom:1.5rem; }
+
+/* CONFIG */
+#config-box {
+  background:#0d0d20; border:1px solid #3a3a5e; border-radius:6px;
+  padding:28px; width:520px; display:flex; flex-direction:column; gap:12px;
+}
+.cfg-note { font-size:.6rem; color:#7a7a9a; line-height:1.9; }
+.cfg-note a { color:#f0b840; text-decoration:none; }
+.cfg-note a:hover { text-decoration:underline; }
+#cfg-err { font-size:.65rem; color:#e74c3c; min-height:1em; }
+</style>
+</head>
+<body>
+
+<!-- ─── SCREEN: FIREBASE CONFIG ─── -->
+<div id="screen-config" class="screen active">
+  <h1>LANEMASTERS</h1>
+  <div id="config-box">
+    <h2>FIREBASE SETUP</h2>
+    <div class="cfg-note">
+      1. Go to <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a><br>
+      2. Create a project → Add a Web App → copy your config<br>
+      3. Realtime Database → Create database → <b>Start in test mode</b><br>
+      4. Paste your Firebase config JSON below:
+    </div>
+    <textarea id="cfg-json" placeholder='{
+  "apiKey": "...",
+  "authDomain": "...",
+  "databaseURL": "...",
+  "projectId": "..."
+}'></textarea>
+    <div id="cfg-err"></div>
+    <button class="primary" onclick="submitConfig()">CONNECT →</button>
+    <div class="cfg-note" style="font-size:.55rem">Config is saved in localStorage for next time.</div>
+  </div>
+</div>
+
+<!-- ─── SCREEN: LOBBY ─── -->
+<div id="screen-lobby" class="screen">
+  <h1>LANEMASTERS</h1>
+  <div class="gap" style="gap:14px">
+    <input id="player-name" type="text" placeholder="YOUR NAME" maxlength="14" style="text-align:center;text-transform:uppercase">
+    <div class="row">
+      <button class="primary" onclick="createRoom()">CREATE ROOM</button>
+      <button onclick="showJoin()">JOIN ROOM</button>
+    </div>
+    <div id="join-row" class="row" style="display:none">
+      <input id="join-code" type="text" placeholder="ROOM CODE" maxlength="6"
+        style="width:140px;text-align:center;text-transform:uppercase;letter-spacing:4px">
+      <button class="primary" onclick="joinRoom()">JOIN →</button>
+    </div>
+    <div id="lobby-status"></div>
+    <div id="room-code-display" style="display:none"></div>
+    <div id="lobby-wait" style="display:none;font-size:.65rem;color:#7a7a9a">Waiting for opponent…</div>
+  </div>
+</div>
+
+<!-- ─── SCREEN: CHARACTER SELECT ─── -->
+<div id="screen-charselect" class="screen">
+  <h2>CHOOSE YOUR CHAMPION</h2>
+  <div id="char-grid"></div>
+  <div id="char-select-status">← Pick a character to lock in →</div>
+  <button id="lock-btn" class="primary" style="margin-top:8px;display:none" onclick="lockCharacter()">
+    LOCK IN ⚔️
+  </button>
+</div>
+
+<!-- ─── SCREEN: GAME ─── -->
+<div id="screen-game" class="screen" style="padding:0">
+  <div id="hud">
+    <div class="p-hud" id="hud-left">
+      <span id="hl-name" style="color:#4af">YOU</span>
+      <div class="hpbar-wrap"><div class="hpbar" id="hl-hp" style="background:#2ecc71;width:100%"></div></div>
+      <span id="hl-hpnum">150</span>
+      <div class="ability-row">
+        <div class="aslot" id="aslot-atk"><span>ATK</span><span class="akey">J</span><div class="acool hidden" id="acool-atk">0</div></div>
+        <div class="aslot" id="aslot-ab1"><span id="ab1-name">Q</span><span class="akey">Q</span><div class="acool hidden" id="acool-ab1">0</div></div>
+        <div class="aslot" id="aslot-ab2"><span id="ab2-name">E</span><span class="akey">E</span><div class="acool hidden" id="acool-ab2">0</div></div>
+      </div>
+    </div>
+    <div style="text-align:center">
+      <div id="hud-status">⚔️ PLAYING</div>
+      <div id="hud-wave">Wave 0 — Next in 30s</div>
+    </div>
+    <div class="p-hud" id="hud-right" style="flex-direction:row-reverse">
+      <span id="hr-name" style="color:#f44">ENEMY</span>
+      <div class="hpbar-wrap"><div class="hpbar" id="hr-hp" style="background:#e74c3c;width:100%"></div></div>
+      <span id="hr-hpnum">?</span>
+    </div>
+  </div>
+  <div id="game-wrap">
+    <canvas id="game-canvas"></canvas>
+  </div>
+</div>
+
+<!-- WIN OVERLAY -->
+<div id="win-overlay">
+  <div id="win-msg"></div>
+  <button class="primary" onclick="location.reload()">PLAY AGAIN</button>
+</div>
+
+<!-- FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<script>
+'use strict';
+// ================================================================
+//  LANEMASTERS — 2-Lane Side-Scroll MOBA
+//  Firebase Realtime Database multiplayer (Host/Guest)
+//  
+//  TO ADD A CHARACTER: just add an entry to CHARACTERS below.
+//  Everything else (UI, stats, abilities) is automatic.
+// ================================================================
+
+// ================================================================
+//  CHARACTER REGISTRY — THE MODULAR SYSTEM
+//  Add any character here. No other code changes needed.
+//  
+//  stats: maxHp, speed(px/frame), atk(damage), range(px), 
+//         cooldown(frames @60fps)
+//  ability1: name, desc, cooldown(frames), fn(player, state)→void
+//  ability2: name, desc, cooldown(frames), fn(player, state)→void
+//  color: hex, shape: rect|diamond|triangle|circle
+// ================================================================
+const CHARACTERS = {
+  warrior: {
+    name:'Warrior', emoji:'⚔️', color:'#3a7fd5', shape:'rect',
+    description:'Tough frontliner. Shield Bash stuns.',
+    stats:{ maxHp:150, speed:2.5, atk:10, range:58, cooldown:45 },
+    ability1:{
+      name:'Shield Bash', desc:'Melee burst 25dmg', cooldown:300,
+      fn(p,s){ meleeAbility(p,s,25,65); flashEffect(p,'#fff',8); }
+    },
+    ability2:{
+      name:'Rally', desc:'+40 temp HP', cooldown:480,
+      fn(p){ p.hp = Math.min(p.maxHp + 40, p.hp + 40); floatText(p,'+40 HP','#2ecc71'); }
+    }
+  },
+  mage: {
+    name:'Mage', emoji:'🔮', color:'#9b5de5', shape:'circle',
+    description:'Ranged AoE. Fireball explodes in a burst.',
+    stats:{ maxHp:80, speed:2.0, atk:8, range:210, cooldown:60 },
+    ability1:{
+      name:'Fireball', desc:'AoE 25dmg', cooldown:240,
+      fn(p,s){ launchProjectile(p,s,{type:'fireball',dmg:25,aoe:55,speed:5,color:'#ff6a00'}); }
+    },
+    ability2:{
+      name:'Frost Nova', desc:'Slow nearby 3s', cooldown:360,
+      fn(p,s){ aoeAbility(p,s,90,8,'#7af'); applyStatusToArea(p,s,90,'slow',180); }
+    }
+  },
+  rogue: {
+    name:'Rogue', emoji:'🗡️', color:'#1abc9c', shape:'diamond',
+    description:'Fast striker. Dash for burst damage.',
+    stats:{ maxHp:100, speed:4.0, atk:10, range:52, cooldown:30 },
+    ability1:{
+      name:'Dash Strike', desc:'Lunge 20dmg', cooldown:200,
+      fn(p,s){ dashAbility(p,s,80,20); }
+    },
+    ability2:{
+      name:'Smoke Bomb', desc:'+50% evasion 2s', cooldown:300,
+      fn(p){ p.evasion = (p.evasion||0)+0.5; p.evasionTimer = 120;
+             floatText(p,'SMOKE','#aaa'); flashEffect(p,'#aaa',6); }
+    }
+  },
+  archer: {
+    name:'Archer', emoji:'🏹', color:'#27ae60', shape:'triangle',
+    description:'Long range. Multi-shot volleys.',
+    stats:{ maxHp:90, speed:2.5, atk:7, range:260, cooldown:42 },
+    ability1:{
+      name:'Volley', desc:'3 arrows fan', cooldown:220,
+      fn(p,s){
+        for(let a=-1;a<=1;a++) launchProjectile(p,s,{type:'arrow',dmg:8,aoe:0,speed:7,color:'#27ae60',spread:a*0.25});
+      }
+    },
+    ability2:{
+      name:'Aimed Shot', desc:'Long range 28dmg', cooldown:300,
+      fn(p,s){ launchProjectile(p,s,{type:'arrow',dmg:28,aoe:0,speed:9,color:'#f0b840'}); }
+    }
+  },
+  barbarian: {
+    name:'Barbarian', emoji:'🪓', color:'#e67e22', shape:'rect',
+    description:'Massive HP. Rage doubles attack.',
+    stats:{ maxHp:200, speed:1.5, atk:15, range:62, cooldown:72 },
+    ability1:{
+      name:'Ground Slam', desc:'AoE 30dmg', cooldown:280,
+      fn(p,s){ aoeAbility(p,s,80,30,'#e67e22'); shakeScreen(); }
+    },
+    ability2:{
+      name:'Rage', desc:'2x ATK for 4s', cooldown:420,
+      fn(p){ p.rageTimer = 240; floatText(p,'RAGE!','#e74c3c'); flashEffect(p,'#e74c3c',10); }
+    }
+  },
+  summoner: {
+    name:'Summoner', emoji:'👁️', color:'#8e44ad', shape:'hex',
+    description:'Calls minion allies. Drain leeches.',
+    stats:{ maxHp:90, speed:2.0, atk:5, range:85, cooldown:55 },
+    ability1:{
+      name:'Summon', desc:'Spawn ally minion', cooldown:360,
+      fn(p,s){ spawnSummonedMinion(p,s); floatText(p,'ARISE!','#8e44ad'); }
+    },
+    ability2:{
+      name:'Drain', desc:'Steal 20HP', cooldown:300,
+      fn(p,s){ drainAbility(p,s,20); }
+    }
+  },
+  thief: {
+    name:'Thief', emoji:'👤', color:'#7f8c8d', shape:'diamond',
+    description:'Sneaky. Vanish becomes invisible.',
+    stats:{ maxHp:100, speed:3.5, atk:8, range:52, cooldown:35 },
+    ability1:{
+      name:'Vanish', desc:'Invisible 2.5s', cooldown:280,
+      fn(p){ p.invisible = 150; floatText(p,'...','#aaa'); }
+    },
+    ability2:{
+      name:'Pickpocket', desc:'Stun nearby 1.5s', cooldown:340,
+      fn(p,s){ aoeAbility(p,s,70,5,'#7f8c8d'); applyStatusToArea(p,s,70,'stun',90); }
+    }
+  },
+  assassin: {
+    name:'Assassin', emoji:'⚡', color:'#c0392b', shape:'triangle',
+    description:'Extreme burst. Blink to target.',
+    stats:{ maxHp:85, speed:5.0, atk:14, range:48, cooldown:25 },
+    ability1:{
+      name:'Shadow Strike', desc:'Teleport & 40dmg', cooldown:200,
+      fn(p,s){ blinkStrike(p,s,150,40); }
+    },
+    ability2:{
+      name:'Execute', desc:'30dmg + 2x if low HP', cooldown:360,
+      fn(p,s){
+        const bonus = 2;
+        meleeAbility(p,s,30 * bonus, 60);
+        floatText(p,'EXECUTE','#c0392b');
+      }
+    }
+  }
+  // ────────────────────────────────────────
+  // ADD NEW CHARACTERS HERE — no other changes needed!
+  // Example template:
+  // mychar: {
+  //   name:'MyChar', emoji:'🔥', color:'#hex', shape:'rect|diamond|triangle|circle|hex',
+  //   description:'Short description.',
+  //   stats:{ maxHp:100, speed:2.5, atk:10, range:80, cooldown:45 },
+  //   ability1:{ name:'Skill', desc:'Desc', cooldown:240, fn(p,s){} },
+  //   ability2:{ name:'Skill', desc:'Desc', cooldown:360, fn(p,s){} }
+  // }
+  // ────────────────────────────────────────
+};
+
+// ================================================================
+//  GAME CONSTANTS
+// ================================================================
+const C = {
+  W: 1200, H: 440,
+  LANE_Y: [120, 320],       // center y of each lane
+  LANE_H: 80,               // visual height of lane band
+  BASE_W: 60, BASE_X_L: 0, BASE_X_R: 1140,
+  BASE_HP: 100,
+  TOWER_W: 36, TOWER_H: 70,
+  TOWER_HP: 20,
+  TOWER_ATK: { minion: 15, player: 20 },
+  TOWER_RANGE: 160, TOWER_COOLDOWN: 70,
+  MINION_HP: 30,
+  MINION_ATK: { minion: 3, player: 5, tower: 3, base: 5 },
+  MINION_SPEED: 0.8, MINION_RANGE: 45, MINION_COOLDOWN: 80,
+  MINION_W: 18, MINION_H: 22,
+  PLAYER_W: 24, PLAYER_H: 34,
+  WAVE_INTERVAL: 1800,     // frames between waves (30s @60fps)
+  MINIONS_PER_WAVE: 3,
+  SYNC_INTERVAL_HOST: 6,   // sync every N frames (~10fps for state)
+  SYNC_INTERVAL_PLAYER: 3, // player pos sync
+  PROJ_LIFETIME: 120,
+  // Tower x positions [near, far] from each side
+  TOWER_X: { left:[250,520], right:[950,680] },
+  FPS: 60
+};
+
+// ================================================================
+//  GLOBAL STATE
+// ================================================================
+let db, roomRef, isHost=false, myId='', guestId='', roomId='';
+let myChar='', opponentChar='', myName='', opName='';
+let selectedChar='';
+
+// LOCAL game state (host runs simulation; guest predicts self)
+let G = {
+  players: {},   // {[id]: PlayerObject}
+  minions: [],
+  towers: [],
+  nexus: { left:{hp:C.BASE_HP,maxHp:C.BASE_HP}, right:{hp:C.BASE_HP,maxHp:C.BASE_HP} },
+  projectiles: [],
+  particles: [],
+  floats: [],
+  wave: 0, waveTimer: C.WAVE_INTERVAL,
+  frame: 0, phase:'playing',
+  shake: 0
+};
+
+// Firebase state (latest snapshot from Firebase)
+let FB = { players:{}, minions:[], towers:[], nexus:null, wave:0, waveTimer:0, phase:'playing', frame:0 };
+
+// Keys currently held
+const keys = {};
+let lastKeys = {};
+
+// Cooldown trackers for local player
+let atkCool=0, ab1Cool=0, ab2Cool=0;
+
+// Canvas
+let canvas, ctx;
+let animId;
+let hostSyncTimer=0, playerSyncTimer=0;
+
+// ================================================================
+//  FIREBASE CONFIG
+// ================================================================
+function submitConfig() {
+  const raw = document.getElementById('cfg-json').value.trim();
+  const err = document.getElementById('cfg-err');
+  try {
+    const cfg = JSON.parse(raw);
+    if (!cfg.databaseURL) throw new Error('Missing databaseURL');
+    firebase.initializeApp(cfg);
+    db = firebase.database();
+    localStorage.setItem('lm_fbcfg', raw);
+    err.textContent = '';
+    showScreen('lobby');
+  } catch(e) {
+    err.textContent = '✗ ' + e.message;
+  }
+}
+
+// ================================================================
+//  SCREEN MANAGEMENT
+// ================================================================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-'+id).classList.add('active');
+}
+
+// ================================================================
+//  LOBBY
+// ================================================================
+function showJoin() {
+  document.getElementById('join-row').style.display = 'flex';
+}
+
+function createRoom() {
+  const name = document.getElementById('player-name').value.trim().toUpperCase() || 'PLAYER1';
+  myName = name;
+  myId = Math.random().toString(36).substr(2,9);
+  roomId = Math.random().toString(36).substr(2,6).toUpperCase();
+  isHost = true;
+
+  roomRef = db.ref('rooms/'+roomId);
+  roomRef.set({
+    host: myId, guest: '', hostName: name, guestName: '',
+    phase: 'lobby', hostChar: '', guestChar: ''
+  });
+
+  document.getElementById('room-code-display').style.display = 'block';
+  document.getElementById('room-code-display').textContent = roomId;
+  document.getElementById('lobby-wait').style.display = 'block';
+  setStatus('lobby','Room created! Share code: ' + roomId);
+
+  // Watch for guest joining
+  roomRef.child('guest').on('value', snap => {
+    if (snap.val() && snap.val() !== '') {
+      guestId = snap.val();
+      roomRef.child('guestName').once('value', s => {
+        opName = s.val() || 'PLAYER2';
+        setStatus('lobby', '⚔️ ' + opName + ' joined! Going to character select…');
+        setTimeout(() => goToCharSelect(), 800);
+      });
+    }
+  });
+}
+
+function joinRoom() {
+  const name = document.getElementById('player-name').value.trim().toUpperCase() || 'PLAYER2';
+  myName = name;
+  myId = Math.random().toString(36).substr(2,9);
+  const code = document.getElementById('join-code').value.trim().toUpperCase();
+  if (!code) { setStatus('lobby','Enter a room code!'); return; }
+  roomId = code;
+  isHost = false;
+
+  roomRef = db.ref('rooms/'+code);
+  roomRef.once('value', snap => {
+    const data = snap.val();
+    if (!data) { setStatus('lobby','Room not found!'); return; }
+    if (data.guest) { setStatus('lobby','Room is full!'); return; }
+    guestId = myId;
+    opName = data.hostName || 'HOST';
+
+    roomRef.update({ guest: myId, guestName: name });
+    setStatus('lobby','Joined! Going to character select…');
+    setTimeout(() => goToCharSelect(), 600);
+  });
+}
+
+function setStatus(screen, msg) {
+  const el = document.getElementById(screen+'-status') || document.getElementById('lobby-status');
+  if(el) el.textContent = msg;
+}
+
+// ================================================================
+//  CHARACTER SELECT
+// ================================================================
+function goToCharSelect() {
+  buildCharGrid();
+  showScreen('charselect');
+  // Watch opponent selection
+  const field = isHost ? 'guestChar' : 'hostChar';
+  roomRef.child(field).on('value', snap => {
+    if(snap.val()) {
+      opponentChar = snap.val();
+      document.getElementById('char-select-status').textContent =
+        opName + ' picked ' + CHARACTERS[opponentChar].name + '! ' +
+        (myChar ? 'Waiting for you…' : 'Now pick yours!');
+    }
+  });
+}
+
+function buildCharGrid() {
+  const grid = document.getElementById('char-grid');
+  grid.innerHTML = '';
+  Object.entries(CHARACTERS).forEach(([key, ch]) => {
+    const card = document.createElement('div');
+    card.className = 'char-card';
+    card.innerHTML = `
+      <div class="cicon">${ch.emoji}</div>
+      <div class="cname">${ch.name}</div>
+      <div class="cstats">
+        HP: ${ch.stats.maxHp} | SPD: ${ch.stats.speed}<br>
+        ATK: ${ch.stats.atk} | RNG: ${ch.stats.range}
+      </div>
+      <div class="cdesc">${ch.description}</div>
+      <div class="cdesc" style="margin-top:4px;color:#f0b840">
+        Q: ${ch.ability1.name}<br>E: ${ch.ability2.name}
+      </div>`;
+    card.onclick = () => {
+      document.querySelectorAll('.char-card').forEach(c=>c.classList.remove('selected'));
+      card.classList.add('selected');
+      selectedChar = key;
+      document.getElementById('lock-btn').style.display = 'block';
+    };
+    grid.appendChild(card);
+  });
+}
+
+function lockCharacter() {
+  if (!selectedChar) return;
+  myChar = selectedChar;
+  const field = isHost ? 'hostChar' : 'guestChar';
+  roomRef.update({ [field]: myChar });
+  document.getElementById('char-select-status').textContent =
+    'You locked in ' + CHARACTERS[myChar].name + '! Waiting for ' + opName + '…';
+  document.getElementById('lock-btn').style.display='none';
+
+  // Watch for both locked
+  roomRef.on('value', snap => {
+    const d = snap.val();
+    if (d.hostChar && d.guestChar) {
+      roomRef.off();
+      opponentChar = isHost ? d.guestChar : d.hostChar;
+      startGame();
+    }
+  });
+}
+
+// ================================================================
+//  GAME INIT
+// ================================================================
+function startGame() {
+  showScreen('game');
+  document.getElementById('hud').classList.add('active');
+
+  canvas = document.getElementById('game-canvas');
+  canvas.width = C.W; canvas.height = C.H;
+  ctx = canvas.getContext('2d');
+
+  // Scale canvas to fit viewport
+  scaleCanvas();
+  window.addEventListener('resize', scaleCanvas);
+
+  initGame();
+  setupInput();
+  setupHUD();
+
+  if (isHost) {
+    setupHostSync();
+  } else {
+    setupGuestSync();
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+function scaleCanvas() {
+  const maxW = window.innerWidth;
+  const maxH = window.innerHeight - 50; // hud height
+  const scale = Math.min(maxW / C.W, maxH / C.H, 1.2);
+  canvas.style.width = (C.W * scale) + 'px';
+  canvas.style.height = (C.H * scale) + 'px';
+}
+
+function initGame() {
+  const leftId  = isHost ? myId : guestId;
+  const rightId = isHost ? guestId : myId;
+  const leftChar  = isHost ? myChar : opponentChar;
+  const rightChar = isHost ? opponentChar : myChar;
+  const leftName  = isHost ? myName : opName;
+  const rightName = isHost ? opName : myName;
+
+  G.players[leftId]  = makePlayer(leftId,  leftChar,  'left',  leftName);
+  G.players[rightId] = makePlayer(rightId, rightChar, 'right', rightName);
+
+  G.towers = [];
+  // 1 tower per lane per team
+  for(let lane=0; lane<2; lane++){
+    G.towers.push({id:`tl${lane}`, team:'left',  lane, x:C.TOWER_X.left[0],  hp:C.TOWER_HP, maxHp:C.TOWER_HP, cooldown:0});
+    G.towers.push({id:`tr${lane}`, team:'right', lane, x:C.TOWER_X.right[0], hp:C.TOWER_HP, maxHp:C.TOWER_HP, cooldown:0});
+    // Second towers (inner)
+    G.towers.push({id:`tl${lane}b`, team:'left',  lane, x:C.TOWER_X.left[1],  hp:C.TOWER_HP, maxHp:C.TOWER_HP, cooldown:0});
+    G.towers.push({id:`tr${lane}b`, team:'right', lane, x:C.TOWER_X.right[1], hp:C.TOWER_HP, maxHp:C.TOWER_HP, cooldown:0});
+  }
+
+  G.nexus = { left:{hp:C.BASE_HP,maxHp:C.BASE_HP}, right:{hp:C.BASE_HP,maxHp:C.BASE_HP} };
+  G.minions = [];
+  G.projectiles = [];
+  G.particles = [];
+  G.floats = [];
+  G.wave = 0; G.waveTimer = 180; // first wave in 3s
+  G.frame = 0; G.phase = 'playing';
+  G.shake = 0;
+}
+
+function makePlayer(id, charKey, team, name) {
+  const ch = CHARACTERS[charKey];
+  const x = team==='left' ? 110 : C.W-110;
+  return {
+    id, charKey, team, name,
+    x, y: C.LANE_Y[0], lane:0,
+    hp: ch.stats.maxHp, maxHp: ch.stats.maxHp,
+    speed: ch.stats.speed, atk: ch.stats.atk,
+    range: ch.stats.range, cooldown: ch.stats.cooldown,
+    atkTimer:0, laneSwitch:0,
+    rageTimer:0, invisible:0, evasion:0, evasionTimer:0, slowTimer:0, stunTimer:0,
+    facing: team==='left'?1:-1,
+    state:'idle', dead:false
+  };
+}
+
+// ================================================================
+//  FIREBASE SYNC
+// ================================================================
+function setupHostSync() {
+  // Read guest player state from Firebase
+  db.ref('rooms/'+roomId+'/gplayer').on('value', snap => {
+    if(snap.val()) FB.gplayer = snap.val();
+  });
+  // Read guest attack events
+  db.ref('rooms/'+roomId+'/gevents').on('child_added', snap => {
+    const ev = snap.val();
+    if(ev && G.frame > 0) processGuestEvent(ev);
+    snap.ref.remove();
+  });
+}
+
+function setupGuestSync() {
+  // Read full game state from host
+  db.ref('rooms/'+roomId+'/state').on('value', snap => {
+    if(snap.val()) applyHostState(snap.val());
+  });
+}
+
+function applyHostState(data) {
+  // Update everything EXCEPT our own player (use local prediction)
+  FB = data;
+  if(!isHost) {
+    // Sync minions, towers, nexus from host
+    G.minions = data.minions || [];
+    G.towers = data.towers || G.towers;
+    if(data.nexus) G.nexus = data.nexus;
+    G.wave = data.wave || 0;
+    G.waveTimer = data.waveTimer || 0;
+    G.phase = data.phase || 'playing';
+    // Update opponent player from host
+    const hostId = isHost ? myId : Object.keys(data.players||{}).find(id=>id!==myId);
+    if(hostId && data.players && data.players[hostId]) {
+      if(!G.players[hostId]) G.players[hostId] = data.players[hostId];
+      else Object.assign(G.players[hostId], data.players[hostId]);
+    }
+    // Check win
+    if(data.phase !== 'playing') handleWin(data.phase);
+  }
+}
+
+function processGuestEvent(ev) {
+  if(!isHost) return;
+  const p = G.players[guestId];
+  if(!p || p.dead) return;
+  if(ev.type === 'attack') {
+    doAttack(p, G);
+  } else if(ev.type === 'ability1') {
+    const ch = CHARACTERS[p.charKey];
+    ch.ability1.fn(p, G);
+  } else if(ev.type === 'ability2') {
+    const ch = CHARACTERS[p.charKey];
+    ch.ability2.fn(p, G);
+  } else if(ev.type === 'move') {
+    // Apply position from guest
+    p.x = ev.x; p.lane = ev.lane;
+    p.y = C.LANE_Y[p.lane];
+    p.facing = ev.facing;
+  }
+}
+
+// ================================================================
+//  INPUT
+// ================================================================
+function setupInput() {
+  document.addEventListener('keydown', e => {
+    if(!keys[e.code]) {
+      keys[e.code] = true;
+      handleKeyPress(e.code);
+    }
+  });
+  document.addEventListener('keyup', e => { keys[e.code] = false; });
+}
+
+function handleKeyPress(code) {
+  const p = getMyPlayer();
+  if(!p || p.dead || G.phase !== 'playing') return;
+
+  if(code==='KeyJ' || code==='Space') {
+    if(atkCool <= 0) {
+      atkCool = p.cooldown;
+      if(isHost) doAttack(p, G);
+      else sendGuestEvent({type:'attack'});
+    }
+  }
+  if(code==='KeyQ') {
+    if(ab1Cool <= 0) {
+      const ch = CHARACTERS[p.charKey];
+      ab1Cool = ch.ability1.cooldown;
+      if(isHost) ch.ability1.fn(p, G);
+      else sendGuestEvent({type:'ability1'});
+    }
+  }
+  if(code==='KeyE') {
+    if(ab2Cool <= 0) {
+      const ch = CHARACTERS[p.charKey];
+      ab2Cool = ch.ability2.cooldown;
+      if(isHost) ch.ability2.fn(p, G);
+      else sendGuestEvent({type:'ability2'});
+    }
+  }
+}
+
+function sendGuestEvent(ev) {
+  db.ref('rooms/'+roomId+'/gevents').push(ev);
+}
+
+// ================================================================
+//  GAME LOOP
+// ================================================================
+function gameLoop() {
+  animId = requestAnimationFrame(gameLoop);
+  G.frame++;
+
+  // Tick local cooldowns
+  if(atkCool > 0) atkCool--;
+  if(ab1Cool > 0) ab1Cool--;
+  if(ab2Cool > 0) ab2Cool--;
+
+  const me = getMyPlayer();
+  if(me && !me.dead) {
+    // Movement (both clients move their own player locally)
+    movePlayer(me, keys);
+    me.y = C.LANE_Y[me.lane];
+
+    // Lane switch W/S
+    if((keys['KeyW']||keys['ArrowUp']) && me.laneSwitch<=0) {
+      if(me.lane>0){ me.lane--; me.laneSwitch=20; }
+    }
+    if((keys['KeyS']||keys['ArrowDown']) && me.laneSwitch<=0) {
+      if(me.lane<1){ me.lane++; me.laneSwitch=20; }
+    }
+    if(me.laneSwitch>0) me.laneSwitch--;
+
+    // Sync player to Firebase
+    playerSyncTimer++;
+    if(playerSyncTimer >= C.SYNC_INTERVAL_PLAYER) {
+      playerSyncTimer = 0;
+      const field = isHost ? 'hplayer' : 'gplayer';
+      db.ref('rooms/'+roomId+'/'+field).set({
+        x:me.x, lane:me.lane, hp:me.hp, maxHp:me.maxHp,
+        facing:me.facing, state:me.state, charKey:me.charKey
+      });
+      if(!isHost) {
+        // Also send move event so host can update position
+        sendGuestEvent({type:'move', x:me.x, lane:me.lane, facing:me.facing});
+      }
+    }
+  }
+
+  if(isHost) {
+    hostUpdate();
+  } else {
+    guestUpdate();
+  }
+
+  render();
+  updateHUD();
+}
+
+function movePlayer(p, k) {
+  if(p.stunTimer > 0) { p.stunTimer--; return; }
+  if(p.slowTimer > 0) { p.slowTimer--; }
+  const spd = p.speed * (p.slowTimer > 0 ? 0.5 : 1) * (p.rageTimer > 0 ? 1.2 : 1);
+  const left  = k['KeyA']||k['ArrowLeft'];
+  const right = k['KeyR']||k['KeyD']||k['ArrowRight'];
+  if(left)  { p.x -= spd; p.facing = -1; }
+  if(right) { p.x += spd; p.facing =  1; }
+  // Clamp to map
+  p.x = Math.max(C.PLAYER_W/2, Math.min(C.W - C.PLAYER_W/2, p.x));
+}
+
+// ================================================================
+//  HOST SIMULATION (only runs on host)
+// ================================================================
+function hostUpdate() {
+  // Apply guest player position from Firebase
+  if(FB.gplayer && G.players[guestId]) {
+    const gp = G.players[guestId];
+    Object.assign(gp, FB.gplayer);
+    gp.y = C.LANE_Y[gp.lane||0];
+  }
+
+  // Tick timers
+  for(const p of Object.values(G.players)) {
+    if(p.rageTimer>0) p.rageTimer--;
+    if(p.invisible>0) p.invisible--;
+    if(p.evasionTimer>0) { p.evasionTimer--; if(p.evasionTimer<=0) p.evasion=0; }
+  }
+
+  // Waves
+  G.waveTimer--;
+  if(G.waveTimer <= 0) {
+    G.waveTimer = C.WAVE_INTERVAL;
+    G.wave++;
+    spawnWave();
+  }
+
+  updateMinions();
+  updateTowers();
+  updateProjectiles();
+  updateParticles();
+  checkNexus();
+  checkWinCondition();
+
+  // Sync to Firebase
+  hostSyncTimer++;
+  if(hostSyncTimer >= C.SYNC_INTERVAL_HOST) {
+    hostSyncTimer = 0;
+    syncHostStateToFirebase();
+  }
+}
+
+function guestUpdate() {
+  // Guest just simulates particles locally
+  updateParticles();
+}
+
+function syncHostStateToFirebase() {
+  const data = {
+    frame: G.frame,
+    phase: G.phase,
+    wave: G.wave,
+    waveTimer: G.waveTimer,
+    nexus: G.nexus,
+    minions: G.minions.map(serializeMinion),
+    towers: G.towers.map(serializeTower),
+    players: {}
+  };
+  for(const [id, p] of Object.entries(G.players)) {
+    data.players[id] = {x:p.x, y:p.y, lane:p.lane, hp:p.hp, maxHp:p.maxHp,
+      facing:p.facing, state:p.state, charKey:p.charKey, dead:p.dead,
+      invisible:p.invisible};
+  }
+  db.ref('rooms/'+roomId+'/state').set(data);
+}
+
+function serializeMinion(m) {
+  return {id:m.id, x:m.x, lane:m.lane, hp:m.hp, maxHp:m.maxHp, team:m.team, state:m.state};
+}
+function serializeTower(t) {
+  return {id:t.id, x:t.x, lane:t.lane, hp:t.hp, maxHp:t.maxHp, team:t.team};
+}
+
+// ================================================================
+//  WAVE / MINIONS
+// ================================================================
+function spawnWave() {
+  for(let lane=0; lane<2; lane++) {
+    for(let i=0; i<C.MINIONS_PER_WAVE; i++) {
+      G.minions.push(makeMinion('left',  lane, i));
+      G.minions.push(makeMinion('right', lane, i));
+    }
+  }
+}
+
+let minionIdCounter = 0;
+function makeMinion(team, lane, offset) {
+  const x = team==='left' ? C.BASE_X_L + C.BASE_W + 10 + offset*22 :
+                            C.BASE_X_R - 10 - offset*22;
+  return {
+    id: 'm'+(minionIdCounter++),
+    team, lane, x,
+    y: C.LANE_Y[lane],
+    hp: C.MINION_HP, maxHp: C.MINION_HP,
+    cooldown: 0, state:'march',
+    facing: team==='left'?1:-1
+  };
+}
+
+function updateMinions() {
+  for(const m of G.minions) {
+    if(m.hp <= 0) continue;
+    if(m.cooldown > 0) { m.cooldown--; }
+
+    // Find nearest enemy directly ahead
+    const enemy = nearestEnemyAhead(m);
+
+    if(enemy && distX(m,enemy) <= C.MINION_RANGE) {
+      // Attack
+      m.state = 'attack';
+      if(m.cooldown <= 0) {
+        m.cooldown = C.MINION_COOLDOWN;
+        const dmgType = enemy.maxHp === C.TOWER_HP ? 'tower' :
+                        enemy.maxHp === C.BASE_HP ? 'base' :
+                        (CHARACTERS[enemy.charKey] ? 'player' : 'minion');
+        const dmg = C.MINION_ATK[dmgType] || 3;
+        applyDamage(enemy, dmg, 'minion');
+        spawnParticles(enemy.x, enemy.y, '#f44', 3);
+      }
+    } else if(enemy && distX(m,enemy) <= C.MINION_RANGE * 3) {
+      m.state = 'march'; // blocked but close
+      // march slowly toward
+      m.x += m.facing * C.MINION_SPEED;
+    } else {
+      m.state = 'march';
+      m.x += m.facing * C.MINION_SPEED;
+    }
+
+    // Hit nexus directly
+    if(m.team==='left' && m.x >= C.BASE_X_R + 10) {
+      G.nexus.right.hp -= C.MINION_ATK.base;
+      G.nexus.right.hp = Math.max(0, G.nexus.right.hp);
+      m.hp = 0; // minion gone after reaching base
+    }
+    if(m.team==='right' && m.x <= C.BASE_X_L + C.BASE_W - 10) {
+      G.nexus.left.hp -= C.MINION_ATK.base;
+      G.nexus.left.hp = Math.max(0, G.nexus.left.hp);
+      m.hp = 0;
+    }
+  }
+  // Remove dead
+  G.minions = G.minions.filter(m => m.hp > 0);
+}
+
+function nearestEnemyAhead(m) {
+  let nearest=null, nearestDist=Infinity;
+  const dir = m.facing;
+
+  // Check enemy minions
+  for(const other of G.minions) {
+    if(other.team === m.team || other.hp<=0 || other.lane!==m.lane) continue;
+    const dx = other.x - m.x;
+    if(Math.sign(dx) !== dir && dx!==0) continue; // not ahead
+    const d = Math.abs(dx);
+    if(d < nearestDist) { nearestDist=d; nearest=other; }
+  }
+  // Check enemy towers
+  for(const t of G.towers) {
+    if(t.team===m.team || t.hp<=0 || t.lane!==m.lane) continue;
+    const dx = t.x - m.x;
+    if(Math.sign(dx)!==dir && dx!==0) continue;
+    const d = Math.abs(dx);
+    if(d < nearestDist) { nearestDist=d; nearest=t; }
+  }
+  // Check enemy nexus
+  const nexusTeam = m.team==='left'?'right':'left';
+  const nexus = G.nexus[nexusTeam];
+  if(nexus.hp > 0) {
+    const nx = m.team==='left' ? C.BASE_X_R + 30 : C.BASE_X_L + 30;
+    const dx = nx - m.x;
+    if(Math.sign(dx)===dir) {
+      const d=Math.abs(dx);
+      if(d<nearestDist){nearestDist=d;nearest={...nexus,x:nx,y:m.y,id:'nexus_'+nexusTeam,_isNexus:nexusTeam};}
+    }
+  }
+
+  return nearest;
+}
+
+function distX(a, b) { return Math.abs(a.x - b.x); }
+
+// ================================================================
+//  TOWERS
+// ================================================================
+function updateTowers() {
+  for(const t of G.towers) {
+    if(t.hp <= 0) continue;
+    if(t.cooldown > 0) { t.cooldown--; continue; }
+
+    // Find nearest enemy in range (prioritize minions)
+    let target=null, targetDist=Infinity;
+    // Check enemy minions in lane
+    for(const m of G.minions) {
+      if(m.team===t.team || m.lane!==t.lane) continue;
+      const d = Math.abs(m.x-t.x);
+      if(d < C.TOWER_RANGE && d < targetDist) { targetDist=d; target=m; }
+    }
+    // Check enemy players in lane
+    if(!target) {
+      for(const p of Object.values(G.players)) {
+        if(p.team===t.team || p.dead || p.lane!==t.lane) continue;
+        const d = Math.abs(p.x-t.x);
+        if(d < C.TOWER_RANGE && d < targetDist) { targetDist=d; target=p; }
+      }
+    }
+
+    if(target) {
+      t.cooldown = C.TOWER_COOLDOWN;
+      const isPlayer = !!target.charKey;
+      const dmg = isPlayer ? C.TOWER_ATK.player : C.TOWER_ATK.minion;
+      applyDamage(target, dmg, 'tower');
+      // Launch visual projectile from tower
+      G.projectiles.push({
+        id:'tp'+G.frame, x:t.x, y:C.LANE_Y[t.lane],
+        tx:target.x, ty:target.y,
+        vx:0, vy:0, speed:6, dmg:0, aoe:0,
+        team:t.team, targetId:target.id, type:'bolt',
+        color:t.team==='left'?'#4af':'#f44', lifetime:C.PROJ_LIFETIME,
+        visual:true // purely visual, damage already applied
+      });
+      spawnParticles(target.x, target.y, t.team==='left'?'#4af':'#f44', 4);
+    }
+  }
+}
+
+// ================================================================
+//  COMBAT
+// ================================================================
+function doAttack(p, state) {
+  if(p.dead) return;
+  const ch = CHARACTERS[p.charKey];
+  const range = ch.stats.range;
+  const dmg = p.atk * (p.rageTimer>0 ? 2 : 1);
+  const isRanged = range > 80;
+
+  if(isRanged) {
+    launchProjectile(p, state, {type:'arrow', dmg, aoe:0, speed:7, color:CHARACTERS[p.charKey].color});
+  } else {
+    meleeAbility(p, state, dmg, range);
+  }
+  p.state='attack';
+  spawnParticles(p.x + p.facing*20, p.y, CHARACTERS[p.charKey].color, 5);
+}
+
+function meleeAbility(p, state, dmg, range) {
+  const hitX = p.x + p.facing * range * 0.6;
+  // Hit minions
+  for(const m of state.minions) {
+    if(m.team===p.team || m.lane!==p.lane) continue;
+    if(Math.abs(m.x-hitX)<range*0.7) applyDamage(m, dmg, 'player');
+  }
+  // Hit towers
+  for(const t of state.towers) {
+    if(t.team===p.team || t.lane!==p.lane) continue;
+    if(Math.abs(t.x-hitX)<range*0.7) applyDamage(t, dmg, 'player');
+  }
+  // Hit enemy player
+  for(const op of Object.values(state.players)) {
+    if(op.id===p.id||op.team===p.team||op.dead||op.lane!==p.lane) continue;
+    if(Math.abs(op.x-hitX)<range*0.7) applyDamage(op, dmg, 'player');
+  }
+  // Hit nexus
+  const nexusTeam = p.team==='left'?'right':'left';
+  const nx = p.team==='left' ? C.BASE_X_R+30 : C.BASE_X_L+30;
+  if(Math.abs(nx-hitX)<range*1.2) {
+    G.nexus[nexusTeam].hp = Math.max(0, G.nexus[nexusTeam].hp - dmg);
+    floatText({x:nx,y:C.LANE_Y[p.lane]}, '-'+dmg, '#f44');
+  }
+  spawnParticles(hitX, C.LANE_Y[p.lane], CHARACTERS[p.charKey].color, 6);
+}
+
+function aoeAbility(p, state, radius, dmg, color) {
+  for(const m of state.minions) {
+    if(m.team===p.team||m.lane!==p.lane) continue;
+    if(Math.abs(m.x-p.x)<radius) applyDamage(m, dmg, 'ability');
+  }
+  for(const op of Object.values(state.players)) {
+    if(op.id===p.id||op.team===p.team||op.dead||op.lane!==p.lane) continue;
+    if(Math.abs(op.x-p.x)<radius) applyDamage(op, dmg, 'ability');
+  }
+  spawnParticles(p.x, p.y, color||'#f0b840', 12);
+}
+
+function dashAbility(p, state, dist, dmg) {
+  p.x += p.facing * dist;
+  p.x = Math.max(C.PLAYER_W/2, Math.min(C.W-C.PLAYER_W/2, p.x));
+  meleeAbility(p, state, dmg, 60);
+  spawnParticles(p.x, p.y, CHARACTERS[p.charKey].color, 8);
+}
+
+function blinkStrike(p, state, dist, dmg) {
+  // Find nearest enemy ahead
+  let nearestEnemy=null, nearestDist=Infinity;
+  for(const op of Object.values(state.players)) {
+    if(op.id===p.id||op.team===p.team||op.dead||op.lane!==p.lane) continue;
+    const d = (op.x-p.x)*p.facing;
+    if(d>0 && d<dist && d<nearestDist){nearestDist=d;nearestEnemy=op;}
+  }
+  if(nearestEnemy) {
+    p.x = nearestEnemy.x - p.facing * 40;
+    applyDamage(nearestEnemy, dmg, 'ability');
+    spawnParticles(nearestEnemy.x, nearestEnemy.y, '#c0392b', 10);
+  } else {
+    p.x += p.facing * dist;
+    p.x = Math.max(C.PLAYER_W/2, Math.min(C.W-C.PLAYER_W/2, p.x));
+  }
+  flashEffect(p, '#c0392b', 6);
+}
+
+function drainAbility(p, state, amount) {
+  let drained = false;
+  for(const op of Object.values(state.players)) {
+    if(op.id===p.id||op.team===p.team||op.dead||op.lane!==p.lane) continue;
+    if(Math.abs(op.x-p.x) < 120) {
+      applyDamage(op, amount, 'ability');
+      p.hp = Math.min(p.maxHp, p.hp + amount);
+      floatText(p, '+'+amount, '#2ecc71');
+      drained=true; break;
+    }
+  }
+  if(!drained) floatText(p, 'MISS', '#aaa');
+}
+
+function applyStatusToArea(p, state, radius, status, duration) {
+  for(const op of Object.values(state.players)) {
+    if(op.id===p.id||op.team===p.team||op.dead||op.lane!==p.lane) continue;
+    if(Math.abs(op.x-p.x)<radius) {
+      if(status==='slow') op.slowTimer=duration;
+      if(status==='stun') op.stunTimer=duration;
+    }
+  }
+  for(const m of state.minions) {
+    if(m.team===p.team||m.lane!==p.lane) continue;
+    if(Math.abs(m.x-p.x)<radius) {
+      if(status==='slow') m.slow = duration;
+    }
+  }
+}
+
+function spawnSummonedMinion(p, state) {
+  state.minions.push({
+    id: 'sum'+(minionIdCounter++),
+    team:p.team, lane:p.lane,
+    x: p.x + p.facing*30, y: C.LANE_Y[p.lane],
+    hp: C.MINION_HP*2, maxHp:C.MINION_HP*2,
+    cooldown:0, state:'march',
+    facing:p.facing,
+    summoned:true
+  });
+}
+
+function launchProjectile(p, state, opts) {
+  const angle = opts.spread || 0;
+  const vx = Math.cos(angle) * opts.speed * p.facing;
+  const vy = Math.sin(angle) * opts.speed;
+  state.projectiles.push({
+    id:'p'+Math.random().toString(36).substr(2,6),
+    x: p.x + p.facing*20, y: p.y,
+    lane: p.lane,
+    vx, vy, speed: opts.speed,
+    team: p.team, dmg: opts.dmg, aoe: opts.aoe||0,
+    type: opts.type, color: opts.color,
+    lifetime: C.PROJ_LIFETIME, visual:false
+  });
+}
+
+function updateProjectiles() {
+  for(const proj of G.projectiles) {
+    proj.lifetime--;
+    if(proj.lifetime<=0||proj.visual) { proj.lifetime=0; continue; }
+    proj.x += proj.vx;
+    proj.y += proj.vy;
+
+    // Check hits
+    let hit = false;
+    // Enemy minions in same lane
+    for(const m of G.minions) {
+      if(m.team===proj.team||m.lane!==proj.lane) continue;
+      if(Math.abs(m.x-proj.x)<20 && Math.abs(m.y-proj.y)<20) {
+        applyDamage(m, proj.dmg, 'projectile');
+        if(proj.aoe>0) {
+          for(const m2 of G.minions){
+            if(m2.team===proj.team||m2.id===m.id) continue;
+            if(Math.abs(m2.x-proj.x)<proj.aoe) applyDamage(m2, Math.floor(proj.dmg*0.6),'aoe');
+          }
+          spawnParticles(proj.x, proj.y, proj.color, 12);
+        } else spawnParticles(proj.x, proj.y, proj.color, 5);
+        proj.lifetime=0; hit=true; break;
+      }
+    }
+    if(hit) continue;
+    // Enemy players
+    for(const op of Object.values(G.players)) {
+      if(op.team===proj.team||op.dead||op.lane!==proj.lane) continue;
+      if(Math.abs(op.x-proj.x)<20 && Math.abs(op.y-proj.y)<24) {
+        applyDamage(op, proj.dmg, 'projectile');
+        spawnParticles(proj.x, proj.y, proj.color, 6);
+        proj.lifetime=0; hit=true; break;
+      }
+    }
+    if(hit) continue;
+    // Towers
+    for(const t of G.towers) {
+      if(t.team===proj.team||t.lane!==proj.lane||t.hp<=0) continue;
+      if(Math.abs(t.x-proj.x)<C.TOWER_W && Math.abs(t.y||C.LANE_Y[t.lane]-proj.y)<C.TOWER_H/2) {
+        applyDamage(t, proj.dmg, 'projectile');
+        proj.lifetime=0; break;
+      }
+    }
+    // Nexus hit
+    if(!hit) {
+      const nx = proj.team==='left' ? C.BASE_X_R+30 : C.BASE_X_L+30;
+      const nexusTeam = proj.team==='left'?'right':'left';
+      if(Math.abs(proj.x-nx)<60) {
+        G.nexus[nexusTeam].hp = Math.max(0, G.nexus[nexusTeam].hp - proj.dmg);
+        spawnParticles(proj.x, proj.y, proj.color, 8);
+        proj.lifetime=0;
+      }
+    }
+    // Out of bounds
+    if(proj.x < 0 || proj.x > C.W) proj.lifetime=0;
+  }
+  G.projectiles = G.projectiles.filter(p=>p.lifetime>0);
+}
+
+function applyDamage(target, amount, source) {
+  if(!target || target.hp === undefined) return;
+  // Evasion check
+  if(target.evasion && Math.random() < target.evasion) {
+    floatText(target, 'DODGE', '#fff');
+    return;
+  }
+  target.hp = Math.max(0, target.hp - amount);
+  floatText(target, '-'+amount, source==='player'||source==='ability'?'#f66':'#fa8');
+  if(target.hp <= 0 && target.charKey) target.dead = true;
+}
+
+function checkNexus() {
+  for(const side of ['left','right']) {
+    if(G.nexus[side].hp < 0) G.nexus[side].hp = 0;
+  }
+}
+
+function checkWinCondition() {
+  if(G.phase !== 'playing') return;
+  if(G.nexus.right.hp <= 0) { G.phase = 'win_left'; handleWin('win_left'); }
+  if(G.nexus.left.hp  <= 0) { G.phase = 'win_right'; handleWin('win_right'); }
+  // If a player dies, respawn after 5s
+  for(const p of Object.values(G.players)) {
+    if(p.dead) {
+      if(!p.respawnTimer) p.respawnTimer = 300;
+      p.respawnTimer--;
+      if(p.respawnTimer <= 0) {
+        p.hp = p.maxHp;
+        p.dead = false;
+        p.respawnTimer = 0;
+        p.x = p.team==='left'?110:C.W-110;
+        p.lane = 0; p.y = C.LANE_Y[0];
+        floatText(p, 'RESPAWN', '#2ecc71');
+      }
+    }
+  }
+}
+
+function handleWin(phase) {
+  if(document.getElementById('win-overlay').classList.contains('active')) return;
+  const myTeam = G.players[myId]?.team;
+  let msg='';
+  if(phase==='win_left') msg = myTeam==='left'?'🏆 VICTORY!':'💀 DEFEAT';
+  if(phase==='win_right') msg = myTeam==='right'?'🏆 VICTORY!':'💀 DEFEAT';
+  const winEl = document.getElementById('win-msg');
+  winEl.textContent = msg;
+  winEl.style.color = msg.includes('VICTORY')?'#f0b840':'#e74c3c';
+  document.getElementById('win-overlay').classList.add('active');
+  cancelAnimationFrame(animId);
+}
+
+// ================================================================
+//  PARTICLES & FLOATS
+// ================================================================
+function spawnParticles(x, y, color, count) {
+  for(let i=0;i<count;i++) {
+    G.particles.push({
+      x, y, vx:(Math.random()-0.5)*4, vy:(Math.random()-0.5)*4-1,
+      life:30+Math.random()*20, maxLife:50, color
+    });
+  }
+}
+
+function floatText(entity, text, color) {
+  G.floats.push({
+    x: entity.x||0, y: (entity.y||200)-10,
+    text, color, life:60, vy:-0.8
+  });
+}
+
+function flashEffect(entity, color, frames) {
+  entity._flash = frames; entity._flashColor = color;
+}
+
+function shakeScreen() { G.shake = 8; }
+
+function updateParticles() {
+  for(const p of G.particles) { p.x+=p.vx; p.y+=p.vy; p.vy+=0.08; p.life--; }
+  for(const f of G.floats) { f.y+=f.vy; f.life--; }
+  G.particles = G.particles.filter(p=>p.life>0);
+  G.floats = G.floats.filter(f=>f.life>0);
+  if(G.shake>0) G.shake--;
+  for(const p of Object.values(G.players)) { if(p._flash>0) p._flash--; }
+}
+
+// ================================================================
+//  RENDERING
+// ================================================================
+function render() {
+  if(G.shake>0) {
+    const s=G.shake;
+    ctx.setTransform(1,0,0,1,(Math.random()-0.5)*s,(Math.random()-0.5)*s);
+  } else ctx.setTransform(1,0,0,1,0,0);
+
+  ctx.clearRect(0,0,C.W,C.H);
+
+  // Background
+  ctx.fillStyle='#04040d'; ctx.fillRect(0,0,C.W,C.H);
+
+  // Lane bands
+  for(let lane=0;lane<2;lane++) {
+    const ly = C.LANE_Y[lane];
+    ctx.fillStyle='#0a0a1a';
+    ctx.fillRect(C.BASE_X_L+C.BASE_W, ly-C.LANE_H/2, C.W-C.BASE_W*2, C.LANE_H);
+    // Lane border
+    ctx.strokeStyle='#1a1a3a'; ctx.lineWidth=1;
+    ctx.strokeRect(C.BASE_X_L+C.BASE_W, ly-C.LANE_H/2, C.W-C.BASE_W*2, C.LANE_H);
+  }
+
+  // Bases (nexus)
+  drawNexus('left');
+  drawNexus('right');
+
+  // Towers
+  for(const t of G.towers) { if(t.hp>0) drawTower(t); }
+
+  // Minions
+  for(const m of G.minions) { drawMinion(m); }
+
+  // Players
+  for(const p of Object.values(G.players)) { if(!p.dead) drawPlayer(p); }
+
+  // Projectiles
+  for(const proj of G.projectiles) { drawProjectile(proj); }
+
+  // Particles
+  for(const p of G.particles) {
+    ctx.globalAlpha = p.life/p.maxLife;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x-2, p.y-2, 4, 4);
+  }
+  ctx.globalAlpha=1;
+
+  // Float texts
+  for(const f of G.floats) {
+    ctx.globalAlpha = Math.min(1, f.life/30);
+    ctx.fillStyle = f.color;
+    ctx.font = 'bold 13px Share Tech Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha=1;
+
+  // Tower range (hover debug: off)
+}
+
+function drawNexus(side) {
+  const n = G.nexus[side];
+  const x = side==='left' ? C.BASE_X_L : C.BASE_X_R;
+  const isLeft = side==='left';
+  const teamColor = isLeft ? '#1a3a8a' : '#8a1a1a';
+  const borderColor = isLeft ? '#4a7fff' : '#ff4a4a';
+
+  ctx.fillStyle = teamColor;
+  ctx.fillRect(x, 0, C.BASE_W, C.H);
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, 0, C.BASE_W, C.H);
+
+  // Label
+  ctx.fillStyle = borderColor;
+  ctx.font = '9px Share Tech Mono, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('NEXUS', x+C.BASE_W/2, 20);
+  // HP bar
+  const barW = C.BASE_W-8, barH=8;
+  ctx.fillStyle='#0a0a1a';
+  ctx.fillRect(x+4, 26, barW, barH);
+  const pct = n.hp / n.maxHp;
+  ctx.fillStyle = pct>0.5?'#2ecc71':pct>0.25?'#f0b840':'#e74c3c';
+  ctx.fillRect(x+4, 26, barW*pct, barH);
+  ctx.fillStyle = borderColor;
+  ctx.textAlign='center';
+  ctx.fillText(Math.ceil(n.hp)+'/'+n.maxHp, x+C.BASE_W/2, 48);
+}
+
+function drawTower(t) {
+  const x = t.x;
+  const y = C.LANE_Y[t.lane];
+  const teamColor = t.team==='left'?'#2a4a9a':'#9a2a2a';
+  const borderColor = t.team==='left'?'#4a7fff':'#ff4a4a';
+
+  ctx.fillStyle = teamColor;
+  ctx.fillRect(x-C.TOWER_W/2, y-C.TOWER_H+8, C.TOWER_W, C.TOWER_H);
+  ctx.strokeStyle = borderColor; ctx.lineWidth=2;
+  ctx.strokeRect(x-C.TOWER_W/2, y-C.TOWER_H+8, C.TOWER_W, C.TOWER_H);
+
+  // Tower battlement
+  ctx.fillStyle=borderColor;
+  for(let i=0;i<3;i++){
+    ctx.fillRect(x-C.TOWER_W/2+i*(C.TOWER_W/3+1), y-C.TOWER_H+3, C.TOWER_W/3-1, 8);
+  }
+
+  // HP bar
+  const barW=C.TOWER_W+4;
+  ctx.fillStyle='#0a0a1a';
+  ctx.fillRect(x-barW/2, y-C.TOWER_H+2, barW, 4);
+  ctx.fillStyle = t.hp>10?'#2ecc71':'#e74c3c';
+  ctx.fillRect(x-barW/2, y-C.TOWER_H+2, barW*(t.hp/t.maxHp), 4);
+}
+
+function drawMinion(m) {
+  if(m.hp<=0) return;
+  const x = m.x; const y = m.y;
+  const teamColor = m.team==='left'?'#2060e0':'#e02020';
+  const borderColor = m.team==='left'?'#6090ff':'#ff6060';
+  const isSummoned = m.summoned;
+
+  ctx.fillStyle = m.slow>0?'#88ccff':teamColor;
+  ctx.fillRect(x-C.MINION_W/2, y-C.MINION_H+2, C.MINION_W, C.MINION_H);
+  ctx.strokeStyle = isSummoned?'#8e44ad':borderColor; ctx.lineWidth=1.5;
+  ctx.strokeRect(x-C.MINION_W/2, y-C.MINION_H+2, C.MINION_W, C.MINION_H);
+
+  // HP bar
+  const bw=C.MINION_W+4;
+  ctx.fillStyle='#0a0a1a'; ctx.fillRect(x-bw/2, y-C.MINION_H-2, bw, 3);
+  ctx.fillStyle=teamColor; ctx.fillRect(x-bw/2, y-C.MINION_H-2, bw*(m.hp/m.maxHp), 3);
+}
+
+function drawPlayer(p) {
+  const ch = CHARACTERS[p.charKey];
+  const x=p.x, y=p.y;
+  const w=C.PLAYER_W, h=C.PLAYER_H;
+  const isMe = p.id===myId;
+  const teamBorder = p.team==='left'?'#4a7fff':'#ff4a4a';
+  const flash = p._flash>0;
+
+  ctx.save();
+  // Invisible players are faded
+  if(p.invisible>0 && p.team!==G.players[myId]?.team) {
+    ctx.globalAlpha=0.15;
+  } else if(p.invisible>0) {
+    ctx.globalAlpha=0.4;
+  }
+
+  // Flash effect
+  const bodyColor = flash ? p._flashColor : ch.color;
+
+  // Draw shape based on character
+  ctx.strokeStyle = isMe ? '#fff' : teamBorder; ctx.lineWidth=2;
+  ctx.fillStyle = bodyColor+'cc';
+
+  switch(ch.shape) {
+    case 'rect':
+      ctx.fillRect(x-w/2, y-h+4, w, h);
+      ctx.strokeRect(x-w/2, y-h+4, w, h);
+      break;
+    case 'circle':
+      ctx.beginPath(); ctx.arc(x, y-h/2+4, h/2, 0, Math.PI*2);
+      ctx.fill(); ctx.stroke(); break;
+    case 'diamond':
+      ctx.beginPath();
+      ctx.moveTo(x, y-h+4); ctx.lineTo(x+w/2, y-h/2+4);
+      ctx.lineTo(x, y+4); ctx.lineTo(x-w/2, y-h/2+4);
+      ctx.closePath(); ctx.fill(); ctx.stroke(); break;
+    case 'triangle':
+      ctx.beginPath();
+      ctx.moveTo(x, y-h+4);
+      ctx.lineTo(x+w/2+3, y+4);
+      ctx.lineTo(x-w/2-3, y+4);
+      ctx.closePath(); ctx.fill(); ctx.stroke(); break;
+    case 'hex':
+      ctx.beginPath();
+      for(let i=0;i<6;i++){
+        const a=(Math.PI/3)*i - Math.PI/6;
+        const r=h/2;
+        if(i===0) ctx.moveTo(x+r*Math.cos(a), y-h/2+4+r*Math.sin(a));
+        else ctx.lineTo(x+r*Math.cos(a), y-h/2+4+r*Math.sin(a));
+      }
+      ctx.closePath(); ctx.fill(); ctx.stroke(); break;
+    default:
+      ctx.fillRect(x-w/2, y-h+4, w, h);
+      ctx.strokeRect(x-w/2, y-h+4, w, h);
+  }
+
+  // Emoji
+  ctx.font='14px serif'; ctx.textAlign='center';
+  ctx.fillText(ch.emoji, x, y-h/2+8);
+
+  // HP bar
+  const bw=w+10;
+  ctx.fillStyle='#0a0a1a'; ctx.fillRect(x-bw/2, y-h, bw, 5);
+  const pct=p.hp/p.maxHp;
+  ctx.fillStyle=pct>0.5?'#2ecc71':pct>0.25?'#f0b840':'#e74c3c';
+  ctx.fillRect(x-bw/2, y-h, bw*pct, 5);
+
+  // Name
+  ctx.fillStyle= isMe?'#fff':teamBorder;
+  ctx.font='8px Share Tech Mono, monospace'; ctx.textAlign='center';
+  ctx.fillText(p.name||p.charKey, x, y-h-6);
+
+  // Status indicators
+  if(p.rageTimer>0) { ctx.fillStyle='#e74c3c'; ctx.font='10px serif'; ctx.fillText('💢',x+16,y-h+12); }
+  if(p.invisible>0) { ctx.fillStyle='#aaa'; ctx.font='10px serif'; ctx.fillText('👁',x-16,y-h+12); }
+  if(p.stunTimer>0) { ctx.fillStyle='#ff0'; ctx.font='10px serif'; ctx.fillText('⭐',x,y-h+12); }
+
+  ctx.restore();
+}
+
+function drawProjectile(proj) {
+  if(proj.lifetime<=0) return;
+  ctx.beginPath();
+  ctx.arc(proj.x, proj.y, proj.type==='fireball'?6:3, 0, Math.PI*2);
+  ctx.fillStyle = proj.color;
+  ctx.fill();
+  if(proj.type==='fireball') {
+    ctx.shadowBlur=15; ctx.shadowColor=proj.color;
+    ctx.fill(); ctx.shadowBlur=0;
+  }
+}
+
+// ================================================================
+//  HUD
+// ================================================================
+function setupHUD() {
+  const me = G.players[myId];
+  if(!me) return;
+  document.getElementById('hl-name').textContent = me.name;
+  document.getElementById('hl-name').style.color = me.team==='left'?'#4af':'#f44';
+  const ch = CHARACTERS[me.charKey];
+  document.getElementById('ab1-name').textContent = ch.ability1.name.substr(0,6);
+  document.getElementById('ab2-name').textContent = ch.ability2.name.substr(0,6);
+}
+
+function updateHUD() {
+  const me = G.players[myId];
+  const op = Object.values(G.players).find(p=>p.id!==myId);
+
+  if(me) {
+    const pct = me.hp/me.maxHp;
+    document.getElementById('hl-hp').style.width = (pct*100)+'%';
+    document.getElementById('hl-hpnum').textContent = Math.max(0,Math.ceil(me.hp))+'/'+me.maxHp;
+  }
+  if(op) {
+    const pct = op.hp/op.maxHp;
+    document.getElementById('hr-hp').style.width = (pct*100)+'%';
+    document.getElementById('hr-hpnum').textContent = Math.max(0,Math.ceil(op.hp))+'/'+op.maxHp;
+    document.getElementById('hr-name').textContent = op.name||opName;
+  }
+
+  // Ability cooldown overlays
+  const ch = myChar ? CHARACTERS[myChar] : null;
+  updateCoolUI('acool-atk', atkCool, 45);
+  if(ch) {
+    updateCoolUI('acool-ab1', ab1Cool, ch.ability1.cooldown);
+    updateCoolUI('acool-ab2', ab2Cool, ch.ability2.cooldown);
+  }
+
+  // Wave timer
+  const secsToWave = Math.ceil(G.waveTimer/C.FPS);
+  document.getElementById('hud-wave').textContent = `Wave ${G.wave} · Next in ${secsToWave}s`;
+}
+
+function updateCoolUI(id, cool, maxCool) {
+  const el = document.getElementById(id);
+  if(!el) return;
+  if(cool>0) {
+    el.classList.remove('hidden');
+    el.textContent = Math.ceil(cool/C.FPS);
+  } else {
+    el.classList.add('hidden');
+  }
+}
+
+// ================================================================
+//  UTILITY
+// ================================================================
+function getMyPlayer() { return G.players[myId]; }
+
+// ================================================================
+//  INIT ON LOAD
+// ================================================================
+window.onload = () => {
+  // Check for saved Firebase config
+  const saved = localStorage.getItem('lm_fbcfg');
+  if(saved) {
+    document.getElementById('cfg-json').value = saved;
+  }
+
+  // Try auto-connect
+  if(saved) {
+    try {
+      const cfg = JSON.parse(saved);
+      firebase.initializeApp(cfg);
+      db = firebase.database();
+      showScreen('lobby');
+    } catch(e) {
+      // stay on config screen
+    }
+  }
+};
+</script>
+</body>
+</html>
