@@ -5,1652 +5,1229 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LaneMasters ⚔️</title>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body {
-  background:#04040d; color:#c8c0b0;
-  font-family:'Share Tech Mono',monospace;
-  height:100vh; display:flex; flex-direction:column;
-  align-items:center; justify-content:center; overflow:hidden;
-}
-h1 { font-family:'Press Start 2P',monospace; font-size:2rem; color:#f0b840;
-  text-shadow:0 0 30px #f0b84080; margin-bottom:1.5rem; }
-h2 { font-family:'Press Start 2P',monospace; font-size:1rem; color:#f0b840; margin-bottom:1rem; }
-.screen { display:none; flex-direction:column; align-items:center; justify-content:center;
-  width:100%; height:100%; padding:20px; }
-.screen.active { display:flex; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#04040d;color:#c8c0b0;font-family:'Share Tech Mono',monospace;
+  height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
+h1{font-family:'Press Start 2P',monospace;font-size:2rem;color:#f0b840;
+  text-shadow:0 0 30px #f0b84088;margin-bottom:1.5rem;letter-spacing:2px}
+h2{font-family:'Press Start 2P',monospace;font-size:.9rem;color:#f0b840;margin-bottom:1rem}
+.screen{display:none;flex-direction:column;align-items:center;justify-content:center;
+  width:100%;height:100%;padding:20px}
+.screen.active{display:flex}
 
-input[type=text], textarea {
-  background:#0d0d20; border:1px solid #3a3a5e; color:#c8c0b0;
-  padding:10px 16px; font-family:'Share Tech Mono',monospace; font-size:.9rem;
-  border-radius:3px; outline:none; width:340px;
-}
-input:focus, textarea:focus { border-color:#f0b840; box-shadow:0 0 8px #f0b84040; }
-textarea { width:460px; height:130px; resize:none; font-size:.7rem; }
+input[type=text]{background:#0d0d20;border:1px solid #3a3a5e;color:#c8c0b0;
+  padding:10px 16px;font-family:'Share Tech Mono',monospace;font-size:.9rem;
+  border-radius:3px;outline:none;width:340px}
+input:focus{border-color:#f0b840;box-shadow:0 0 8px #f0b84040}
 
-button {
-  background:#0d0d20; border:1px solid #5a5a8a; color:#c8c0b0;
-  padding:10px 24px; font-family:'Share Tech Mono',monospace; font-size:.85rem;
-  border-radius:3px; cursor:pointer; transition:all .15s; text-transform:uppercase;
-  letter-spacing:1px;
-}
-button:hover { border-color:#f0b840; color:#f0b840; box-shadow:0 0 12px #f0b84030; }
-button.primary { background:#2a1a00; border-color:#f0b840; color:#f0b840; }
-button.primary:hover { background:#3a2500; box-shadow:0 0 20px #f0b84050; }
+button{background:#0d0d20;border:1px solid #5a5a8a;color:#c8c0b0;
+  padding:10px 24px;font-family:'Share Tech Mono',monospace;font-size:.85rem;
+  border-radius:3px;cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:1px}
+button:hover{border-color:#f0b840;color:#f0b840;box-shadow:0 0 12px #f0b84030}
+button.primary{background:#1a1000;border-color:#f0b840;color:#f0b840}
+button.primary:hover{background:#2a1800;box-shadow:0 0 20px #f0b84050}
+button:disabled{opacity:.4;cursor:default}
 
-.gap { gap:10px; display:flex; flex-direction:column; align-items:center; }
-.row { display:flex; gap:10px; align-items:center; }
+.col{display:flex;flex-direction:column;align-items:center;gap:10px}
+.row{display:flex;gap:10px;align-items:center}
+.status{font-size:.7rem;color:#7a7a9a;min-height:1.2em;text-align:center}
+.err{font-size:.7rem;color:#e74c3c;min-height:1.2em;text-align:center}
+.big-code{font-family:'Press Start 2P',monospace;font-size:1.6rem;color:#f0b840;
+  letter-spacing:6px;margin:.5rem 0}
+.box{background:#0d0d20;border:1px solid #2a2a4a;border-radius:6px;padding:24px;
+  display:flex;flex-direction:column;align-items:center;gap:12px;min-width:360px}
+.note{font-size:.6rem;color:#5a5a7a;line-height:1.8;text-align:center}
+.note a{color:#f0b840;text-decoration:none}
+.note a:hover{text-decoration:underline}
 
-/* LOBBY */
-#lobby-status { font-size:.75rem; color:#7a7a9a; margin-top:.5rem; min-height:1.2em; }
-#room-code-display { font-family:'Press Start 2P',monospace; font-size:1.5rem;
-  color:#f0b840; letter-spacing:6px; margin:.5rem 0; }
-
-/* CHAR SELECT */
-#char-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:.8rem 0; }
-.char-card {
-  background:#0d0d20; border:2px solid #2a2a4a; border-radius:4px;
-  padding:12px 8px; cursor:pointer; transition:all .15s; text-align:center; width:130px;
-}
-.char-card:hover, .char-card.selected {
-  border-color:#f0b840; background:#1a1a2e;
-  box-shadow:0 0 12px #f0b84040;
-}
-.char-card .cicon { font-size:2rem; margin-bottom:4px; }
-.char-card .cname { font-size:.55rem; color:#f0b840; letter-spacing:1px; margin-bottom:4px; }
-.char-card .cstats { font-size:.45rem; color:#7a7a9a; line-height:1.7; }
-.char-card .cdesc { font-size:.45rem; color:#a0a0c0; margin-top:4px; font-style:italic; }
-#char-select-status { font-size:.7rem; color:#7a7a9a; margin-top:.5rem; }
+/* char select */
+#char-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:.5rem 0}
+.char-card{background:#0d0d20;border:2px solid #2a2a4a;border-radius:4px;
+  padding:10px 6px;cursor:pointer;transition:all .15s;text-align:center;width:128px}
+.char-card:hover,.char-card.selected{border-color:#f0b840;background:#1a1a2e;box-shadow:0 0 10px #f0b84040}
+.char-card .ci{font-size:1.8rem;margin-bottom:4px}
+.char-card .cn{font-size:.5rem;color:#f0b840;letter-spacing:1px;margin-bottom:3px}
+.char-card .cs{font-size:.42rem;color:#6a6a8a;line-height:1.7}
+.char-card .cd{font-size:.42rem;color:#9a9ab0;margin-top:4px;font-style:italic}
 
 /* HUD */
-#hud {
-  position:fixed; top:0; left:0; right:0;
-  background:#04040dee; padding:5px 16px;
-  display:none; justify-content:space-between; align-items:center;
-  border-bottom:1px solid #2a2a4a; font-size:.65rem; z-index:10;
-}
-#hud.active { display:flex; }
-.p-hud { display:flex; align-items:center; gap:8px; }
-.hpbar-wrap { width:150px; height:12px; background:#1a1a2e; border:1px solid #3a3a5e; border-radius:2px; overflow:hidden; }
-.hpbar { height:100%; transition:width .15s; }
-.ability-row { display:flex; gap:5px; align-items:center; }
-.aslot {
-  width:38px; height:38px; background:#0d0d20; border:1px solid #3a3a5e;
-  border-radius:3px; display:flex; flex-direction:column; align-items:center;
-  justify-content:center; font-size:.5rem; text-align:center; position:relative;
-  line-height:1.3; overflow:hidden;
-}
-.aslot .akey { position:absolute; bottom:2px; right:3px; font-size:.4rem; color:#f0b840; }
-.aslot .acool { position:absolute; inset:0; background:#04040dbb; display:flex;
-  align-items:center; justify-content:center; font-size:.6rem; color:#f0b840; }
-.aslot .acool.hidden { display:none; }
-#hud-status { font-size:.6rem; color:#f0b840; text-align:center; }
-#hud-wave { font-size:.55rem; color:#7a7a9a; }
+#hud{position:fixed;top:0;left:0;right:0;background:#04040dee;padding:4px 14px;
+  display:none;justify-content:space-between;align-items:center;
+  border-bottom:1px solid #1a1a3a;font-size:.6rem;z-index:10;gap:10px}
+#hud.active{display:flex}
+.phud{display:flex;align-items:center;gap:7px}
+.hpwrap{width:130px;height:11px;background:#0d0d20;border:1px solid #2a2a4a;border-radius:2px;overflow:hidden}
+.hpbar{height:100%;transition:width .15s}
+.arow{display:flex;gap:4px}
+.aslot{width:36px;height:36px;background:#0d0d20;border:1px solid #2a2a4a;border-radius:3px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:.45rem;text-align:center;position:relative;line-height:1.3;overflow:hidden}
+.aslot .ak{position:absolute;bottom:1px;right:2px;font-size:.38rem;color:#f0b840}
+.coolover{position:absolute;inset:0;background:#04040dcc;display:flex;
+  align-items:center;justify-content:center;font-size:.65rem;color:#f0b840}
+.coolover.off{display:none}
+#hud-mid{text-align:center;flex:1}
+#hud-wave{font-size:.55rem;color:#6a6a8a}
+#ping-dot{width:7px;height:7px;border-radius:50%;background:#2ecc71;display:inline-block;margin-left:4px}
 
-/* CANVAS */
-#game-wrap { position:relative; }
-#game-canvas { display:block; border:1px solid #1a1a3a; }
+/* canvas */
+#game-wrap{position:relative;margin-top:50px}
+#gc{display:block}
 
-/* WIN SCREEN */
-#win-overlay {
-  position:fixed; inset:0; background:#04040df0;
-  display:none; flex-direction:column; align-items:center; justify-content:center;
-  z-index:100;
-}
-#win-overlay.active { display:flex; }
-#win-msg { font-family:'Press Start 2P',monospace; font-size:2.5rem; margin-bottom:1.5rem; }
-
-/* CONFIG */
-#config-box {
-  background:#0d0d20; border:1px solid #3a3a5e; border-radius:6px;
-  padding:28px; width:520px; display:flex; flex-direction:column; gap:12px;
-}
-.cfg-note { font-size:.6rem; color:#7a7a9a; line-height:1.9; }
-.cfg-note a { color:#f0b840; text-decoration:none; }
-.cfg-note a:hover { text-decoration:underline; }
-#cfg-err { font-size:.65rem; color:#e74c3c; min-height:1em; }
+/* win */
+#win{position:fixed;inset:0;background:#04040df2;display:none;
+  flex-direction:column;align-items:center;justify-content:center;z-index:100}
+#win.show{display:flex}
+#win-msg{font-family:'Press Start 2P',monospace;font-size:2.2rem;margin-bottom:1.5rem}
 </style>
 </head>
 <body>
 
-<!-- ─── SCREEN: FIREBASE CONFIG ─── -->
+<!-- CONFIG -->
 <div id="screen-config" class="screen active">
   <h1>LANEMASTERS</h1>
-  <div id="config-box">
-    <h2>FIREBASE SETUP</h2>
-    <div class="cfg-note">
-      1. Go to <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a><br>
-      2. Create a project → Add a Web App → copy your config<br>
-      3. Realtime Database → Create database → <b>Start in test mode</b><br>
-      4. Paste your Firebase config JSON below:
+  <div class="box" style="max-width:420px">
+    <h2>ABLY API KEY</h2>
+    <div class="note">
+      1. Go to <a href="https://ably.com" target="_blank">ably.com</a> → free account<br>
+      2. Create an app → copy the <b>API Key</b> from the dashboard<br>
+      3. Paste it below — it looks like <span style="color:#f0b840">abc123.def456:xyz...</span>
     </div>
-    <textarea id="cfg-json" placeholder='{
-  "apiKey": "...",
-  "authDomain": "...",
-  "databaseURL": "...",
-  "projectId": "..."
-}'></textarea>
-    <div id="cfg-err"></div>
-    <button class="primary" onclick="submitConfig()">CONNECT →</button>
-    <div class="cfg-note" style="font-size:.55rem">Config is saved in localStorage for next time.</div>
+    <input id="cfg-key" type="text" placeholder="Paste Ably API Key here" style="width:360px">
+    <div id="cfg-err" class="err"></div>
+    <button class="primary" onclick="connectAbly()">CONNECT →</button>
+    <div class="note">Your key is saved in localStorage so you only do this once.</div>
   </div>
 </div>
 
-<!-- ─── SCREEN: LOBBY ─── -->
+<!-- LOBBY -->
 <div id="screen-lobby" class="screen">
   <h1>LANEMASTERS</h1>
-  <div class="gap" style="gap:14px">
-    <input id="player-name" type="text" placeholder="YOUR NAME" maxlength="14" style="text-align:center;text-transform:uppercase">
+  <div class="box">
+    <input id="pname" type="text" placeholder="YOUR NAME" maxlength="14"
+      style="text-align:center;text-transform:uppercase;width:240px">
     <div class="row">
       <button class="primary" onclick="createRoom()">CREATE ROOM</button>
-      <button onclick="showJoin()">JOIN ROOM</button>
+      <button onclick="toggleJoin()">JOIN ROOM</button>
     </div>
     <div id="join-row" class="row" style="display:none">
       <input id="join-code" type="text" placeholder="ROOM CODE" maxlength="6"
-        style="width:140px;text-align:center;text-transform:uppercase;letter-spacing:4px">
+        style="width:130px;text-align:center;text-transform:uppercase;letter-spacing:4px">
       <button class="primary" onclick="joinRoom()">JOIN →</button>
     </div>
-    <div id="lobby-status"></div>
-    <div id="room-code-display" style="display:none"></div>
-    <div id="lobby-wait" style="display:none;font-size:.65rem;color:#7a7a9a">Waiting for opponent…</div>
+    <div id="room-code" class="big-code" style="display:none"></div>
+    <div id="lobby-status" class="status"></div>
+    <div class="note" style="margin-top:4px">
+      <a href="#" onclick="resetConfig();return false">⟵ Change API key</a>
+    </div>
   </div>
 </div>
 
-<!-- ─── SCREEN: CHARACTER SELECT ─── -->
+<!-- CHAR SELECT -->
 <div id="screen-charselect" class="screen">
   <h2>CHOOSE YOUR CHAMPION</h2>
   <div id="char-grid"></div>
-  <div id="char-select-status">← Pick a character to lock in →</div>
-  <button id="lock-btn" class="primary" style="margin-top:8px;display:none" onclick="lockCharacter()">
-    LOCK IN ⚔️
-  </button>
+  <div id="cs-status" class="status" style="margin:.4rem 0">← Pick a character →</div>
+  <button id="lock-btn" class="primary" style="display:none" onclick="lockChar()">LOCK IN ⚔️</button>
 </div>
 
-<!-- ─── SCREEN: GAME ─── -->
+<!-- GAME -->
 <div id="screen-game" class="screen" style="padding:0">
   <div id="hud">
-    <div class="p-hud" id="hud-left">
+    <div class="phud">
       <span id="hl-name" style="color:#4af">YOU</span>
-      <div class="hpbar-wrap"><div class="hpbar" id="hl-hp" style="background:#2ecc71;width:100%"></div></div>
-      <span id="hl-hpnum">150</span>
-      <div class="ability-row">
-        <div class="aslot" id="aslot-atk"><span>ATK</span><span class="akey">J</span><div class="acool hidden" id="acool-atk">0</div></div>
-        <div class="aslot" id="aslot-ab1"><span id="ab1-name">Q</span><span class="akey">Q</span><div class="acool hidden" id="acool-ab1">0</div></div>
-        <div class="aslot" id="aslot-ab2"><span id="ab2-name">E</span><span class="akey">E</span><div class="acool hidden" id="acool-ab2">0</div></div>
+      <div class="hpwrap"><div class="hpbar" id="hl-hp" style="background:#2ecc71;width:100%"></div></div>
+      <span id="hl-hpn">—</span>
+      <div class="arow">
+        <div class="aslot">ATK<span class="ak">J</span><div class="coolover off" id="c-atk"></div></div>
+        <div class="aslot"><span id="ab1n">Q</span><span class="ak">Q</span><div class="coolover off" id="c-ab1"></div></div>
+        <div class="aslot"><span id="ab2n">E</span><span class="ak">E</span><div class="coolover off" id="c-ab2"></div></div>
       </div>
     </div>
-    <div style="text-align:center">
-      <div id="hud-status">⚔️ PLAYING</div>
-      <div id="hud-wave">Wave 0 — Next in 30s</div>
+    <div id="hud-mid">
+      <div id="hud-status" style="color:#f0b840;font-size:.65rem">⚔️ PLAYING</div>
+      <div id="hud-wave">Wave 0 · next in 30s</div>
     </div>
-    <div class="p-hud" id="hud-right" style="flex-direction:row-reverse">
+    <div class="phud" style="flex-direction:row-reverse">
       <span id="hr-name" style="color:#f44">ENEMY</span>
-      <div class="hpbar-wrap"><div class="hpbar" id="hr-hp" style="background:#e74c3c;width:100%"></div></div>
-      <span id="hr-hpnum">?</span>
+      <div class="hpwrap"><div class="hpbar" id="hr-hp" style="background:#e74c3c;width:100%"></div></div>
+      <span id="hr-hpn">—</span>
     </div>
   </div>
-  <div id="game-wrap">
-    <canvas id="game-canvas"></canvas>
-  </div>
+  <div id="game-wrap"><canvas id="gc"></canvas></div>
 </div>
 
-<!-- WIN OVERLAY -->
-<div id="win-overlay">
+<!-- WIN -->
+<div id="win">
   <div id="win-msg"></div>
   <button class="primary" onclick="location.reload()">PLAY AGAIN</button>
 </div>
 
-<!-- FIREBASE -->
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
 <script>
 'use strict';
-// ================================================================
-//  LANEMASTERS — 2-Lane Side-Scroll MOBA
-//  Firebase Realtime Database multiplayer (Host/Guest)
-//  
-//  TO ADD A CHARACTER: just add an entry to CHARACTERS below.
-//  Everything else (UI, stats, abilities) is automatic.
-// ================================================================
 
 // ================================================================
-//  CHARACTER REGISTRY — THE MODULAR SYSTEM
-//  Add any character here. No other code changes needed.
-//  
-//  stats: maxHp, speed(px/frame), atk(damage), range(px), 
-//         cooldown(frames @60fps)
-//  ability1: name, desc, cooldown(frames), fn(player, state)→void
-//  ability2: name, desc, cooldown(frames), fn(player, state)→void
-//  color: hex, shape: rect|diamond|triangle|circle
+//  CHARACTER REGISTRY
+//  To add a character: add one entry here. Nothing else changes.
 // ================================================================
-const CHARACTERS = {
-  warrior: {
-    name:'Warrior', emoji:'⚔️', color:'#3a7fd5', shape:'rect',
-    description:'Tough frontliner. Shield Bash stuns.',
-    stats:{ maxHp:150, speed:2.5, atk:10, range:58, cooldown:45 },
-    ability1:{
-      name:'Shield Bash', desc:'Melee burst 25dmg', cooldown:300,
-      fn(p,s){ meleeAbility(p,s,25,65); flashEffect(p,'#fff',8); }
-    },
-    ability2:{
-      name:'Rally', desc:'+40 temp HP', cooldown:480,
-      fn(p){ p.hp = Math.min(p.maxHp + 40, p.hp + 40); floatText(p,'+40 HP','#2ecc71'); }
-    }
+const CHARS = {
+  warrior:{
+    name:'Warrior',emoji:'⚔️',color:'#3a7fd5',shape:'rect',
+    desc:'Tough frontliner. Shield Bash stuns.',
+    stats:{maxHp:150,speed:2.5,atk:10,range:58,cd:45},
+    q:{name:'Shield Bash',desc:'25dmg burst',cd:300,fn:(p,G)=>meleeAbility(p,G,25,65)},
+    e:{name:'Rally',desc:'+40 temp HP',cd:480,fn:(p)=>{p.hp=Math.min(p.maxHp+40,p.hp+40);float(p,'+40HP','#2ecc71')}}
   },
-  mage: {
-    name:'Mage', emoji:'🔮', color:'#9b5de5', shape:'circle',
-    description:'Ranged AoE. Fireball explodes in a burst.',
-    stats:{ maxHp:80, speed:2.0, atk:8, range:210, cooldown:60 },
-    ability1:{
-      name:'Fireball', desc:'AoE 25dmg', cooldown:240,
-      fn(p,s){ launchProjectile(p,s,{type:'fireball',dmg:25,aoe:55,speed:5,color:'#ff6a00'}); }
-    },
-    ability2:{
-      name:'Frost Nova', desc:'Slow nearby 3s', cooldown:360,
-      fn(p,s){ aoeAbility(p,s,90,8,'#7af'); applyStatusToArea(p,s,90,'slow',180); }
-    }
+  mage:{
+    name:'Mage',emoji:'🔮',color:'#9b5de5',shape:'circle',
+    desc:'Ranged AoE. Fireball explodes.',
+    stats:{maxHp:80,speed:2.0,atk:8,range:220,cd:60},
+    q:{name:'Fireball',desc:'AoE 25dmg',cd:240,fn:(p,G)=>fireball(p,G,25,55)},
+    e:{name:'Frost Nova',desc:'Slow nearby 3s',cd:360,fn:(p,G)=>{aoeHit(p,G,90,8,'#7af');aoeStatus(p,G,90,'slow',180)}}
   },
-  rogue: {
-    name:'Rogue', emoji:'🗡️', color:'#1abc9c', shape:'diamond',
-    description:'Fast striker. Dash for burst damage.',
-    stats:{ maxHp:100, speed:4.0, atk:10, range:52, cooldown:30 },
-    ability1:{
-      name:'Dash Strike', desc:'Lunge 20dmg', cooldown:200,
-      fn(p,s){ dashAbility(p,s,80,20); }
-    },
-    ability2:{
-      name:'Smoke Bomb', desc:'+50% evasion 2s', cooldown:300,
-      fn(p){ p.evasion = (p.evasion||0)+0.5; p.evasionTimer = 120;
-             floatText(p,'SMOKE','#aaa'); flashEffect(p,'#aaa',6); }
-    }
+  rogue:{
+    name:'Rogue',emoji:'🗡️',color:'#1abc9c',shape:'diamond',
+    desc:'Fast striker. Dash for burst.',
+    stats:{maxHp:100,speed:4.0,atk:10,range:52,cd:30},
+    q:{name:'Dash Strike',desc:'Lunge 20dmg',cd:200,fn:(p,G)=>dashStrike(p,G,80,20)},
+    e:{name:'Smoke Bomb',desc:'+50% evade 2s',cd:300,fn:(p)=>{p.evade=.5;p.evadeT=120;float(p,'SMOKE','#aaa')}}
   },
-  archer: {
-    name:'Archer', emoji:'🏹', color:'#27ae60', shape:'triangle',
-    description:'Long range. Multi-shot volleys.',
-    stats:{ maxHp:90, speed:2.5, atk:7, range:260, cooldown:42 },
-    ability1:{
-      name:'Volley', desc:'3 arrows fan', cooldown:220,
-      fn(p,s){
-        for(let a=-1;a<=1;a++) launchProjectile(p,s,{type:'arrow',dmg:8,aoe:0,speed:7,color:'#27ae60',spread:a*0.25});
-      }
-    },
-    ability2:{
-      name:'Aimed Shot', desc:'Long range 28dmg', cooldown:300,
-      fn(p,s){ launchProjectile(p,s,{type:'arrow',dmg:28,aoe:0,speed:9,color:'#f0b840'}); }
-    }
+  archer:{
+    name:'Archer',emoji:'🏹',color:'#27ae60',shape:'tri',
+    desc:'Long range. Multi-arrow volley.',
+    stats:{maxHp:90,speed:2.5,atk:7,range:260,cd:42},
+    q:{name:'Volley',desc:'3-arrow fan',cd:220,fn:(p,G)=>{[-1,0,1].forEach(a=>shoot(p,G,8,0,7,'#27ae60',a*.25))}},
+    e:{name:'Aimed Shot',desc:'Long range 28dmg',cd:300,fn:(p,G)=>shoot(p,G,28,0,9,'#f0b840')}
   },
-  barbarian: {
-    name:'Barbarian', emoji:'🪓', color:'#e67e22', shape:'rect',
-    description:'Massive HP. Rage doubles attack.',
-    stats:{ maxHp:200, speed:1.5, atk:15, range:62, cooldown:72 },
-    ability1:{
-      name:'Ground Slam', desc:'AoE 30dmg', cooldown:280,
-      fn(p,s){ aoeAbility(p,s,80,30,'#e67e22'); shakeScreen(); }
-    },
-    ability2:{
-      name:'Rage', desc:'2x ATK for 4s', cooldown:420,
-      fn(p){ p.rageTimer = 240; floatText(p,'RAGE!','#e74c3c'); flashEffect(p,'#e74c3c',10); }
-    }
+  barbarian:{
+    name:'Barbarian',emoji:'🪓',color:'#e67e22',shape:'rect',
+    desc:'Massive HP. Rage doubles attack.',
+    stats:{maxHp:200,speed:1.5,atk:15,range:62,cd:72},
+    q:{name:'Ground Slam',desc:'AoE 30dmg',cd:280,fn:(p,G)=>{aoeHit(p,G,80,30,'#e67e22');G.shake=8}},
+    e:{name:'Rage',desc:'2x ATK 4s',cd:420,fn:(p)=>{p.rageT=240;float(p,'RAGE!','#e74c3c')}}
   },
-  summoner: {
-    name:'Summoner', emoji:'👁️', color:'#8e44ad', shape:'hex',
-    description:'Calls minion allies. Drain leeches.',
-    stats:{ maxHp:90, speed:2.0, atk:5, range:85, cooldown:55 },
-    ability1:{
-      name:'Summon', desc:'Spawn ally minion', cooldown:360,
-      fn(p,s){ spawnSummonedMinion(p,s); floatText(p,'ARISE!','#8e44ad'); }
-    },
-    ability2:{
-      name:'Drain', desc:'Steal 20HP', cooldown:300,
-      fn(p,s){ drainAbility(p,s,20); }
-    }
+  summoner:{
+    name:'Summoner',emoji:'👁️',color:'#8e44ad',shape:'hex',
+    desc:'Calls ally minions. Life drain.',
+    stats:{maxHp:90,speed:2.0,atk:5,range:85,cd:55},
+    q:{name:'Summon',desc:'Spawn ally minion',cd:360,fn:(p,G)=>spawnSummon(p,G)},
+    e:{name:'Drain',desc:'Steal 20HP',cd:300,fn:(p,G)=>drain(p,G,20)}
   },
-  thief: {
-    name:'Thief', emoji:'👤', color:'#7f8c8d', shape:'diamond',
-    description:'Sneaky. Vanish becomes invisible.',
-    stats:{ maxHp:100, speed:3.5, atk:8, range:52, cooldown:35 },
-    ability1:{
-      name:'Vanish', desc:'Invisible 2.5s', cooldown:280,
-      fn(p){ p.invisible = 150; floatText(p,'...','#aaa'); }
-    },
-    ability2:{
-      name:'Pickpocket', desc:'Stun nearby 1.5s', cooldown:340,
-      fn(p,s){ aoeAbility(p,s,70,5,'#7f8c8d'); applyStatusToArea(p,s,70,'stun',90); }
-    }
+  thief:{
+    name:'Thief',emoji:'👤',color:'#7f8c8d',shape:'diamond',
+    desc:'Sneaky. Vanish turns invisible.',
+    stats:{maxHp:100,speed:3.5,atk:8,range:52,cd:35},
+    q:{name:'Vanish',desc:'Invisible 2.5s',cd:280,fn:(p)=>{p.invis=150;float(p,'...','#aaa')}},
+    e:{name:'Pickpocket',desc:'Stun nearby 1.5s',cd:340,fn:(p,G)=>{aoeHit(p,G,70,5,'#7f8c8d');aoeStatus(p,G,70,'stun',90)}}
   },
-  assassin: {
-    name:'Assassin', emoji:'⚡', color:'#c0392b', shape:'triangle',
-    description:'Extreme burst. Blink to target.',
-    stats:{ maxHp:85, speed:5.0, atk:14, range:48, cooldown:25 },
-    ability1:{
-      name:'Shadow Strike', desc:'Teleport & 40dmg', cooldown:200,
-      fn(p,s){ blinkStrike(p,s,150,40); }
-    },
-    ability2:{
-      name:'Execute', desc:'30dmg + 2x if low HP', cooldown:360,
-      fn(p,s){
-        const bonus = 2;
-        meleeAbility(p,s,30 * bonus, 60);
-        floatText(p,'EXECUTE','#c0392b');
-      }
-    }
+  assassin:{
+    name:'Assassin',emoji:'⚡',color:'#c0392b',shape:'tri',
+    desc:'Extreme burst. Blink to target.',
+    stats:{maxHp:85,speed:5.0,atk:14,range:48,cd:25},
+    q:{name:'Blink Strike',desc:'Teleport+40dmg',cd:200,fn:(p,G)=>blinkStrike(p,G,150,40)},
+    e:{name:'Execute',desc:'30dmg (2x if low)',cd:360,fn:(p,G)=>meleeAbility(p,G,30,60)}
   }
-  // ────────────────────────────────────────
-  // ADD NEW CHARACTERS HERE — no other changes needed!
-  // Example template:
-  // mychar: {
-  //   name:'MyChar', emoji:'🔥', color:'#hex', shape:'rect|diamond|triangle|circle|hex',
-  //   description:'Short description.',
-  //   stats:{ maxHp:100, speed:2.5, atk:10, range:80, cooldown:45 },
-  //   ability1:{ name:'Skill', desc:'Desc', cooldown:240, fn(p,s){} },
-  //   ability2:{ name:'Skill', desc:'Desc', cooldown:360, fn(p,s){} }
+  // ─── ADD NEW CHARACTERS HERE ───────────────────────────────
+  // key: {
+  //   name:'Name', emoji:'🔥', color:'#hex', shape:'rect|circle|diamond|tri|hex',
+  //   desc:'Short description.',
+  //   stats:{ maxHp:100, speed:2.5, atk:10, range:80, cd:45 },
+  //   q:{ name:'Ability', desc:'Desc', cd:240, fn(p,G){} },
+  //   e:{ name:'Ability', desc:'Desc', cd:360, fn(p,G){} }
   // }
-  // ────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────
 };
 
 // ================================================================
-//  GAME CONSTANTS
+//  CONSTANTS
 // ================================================================
-const C = {
-  W: 1200, H: 440,
-  LANE_Y: [120, 320],       // center y of each lane
-  LANE_H: 80,               // visual height of lane band
-  BASE_W: 60, BASE_X_L: 0, BASE_X_R: 1140,
-  BASE_HP: 100,
-  TOWER_W: 36, TOWER_H: 70,
-  TOWER_HP: 20,
-  TOWER_ATK: { minion: 15, player: 20 },
-  TOWER_RANGE: 160, TOWER_COOLDOWN: 70,
-  MINION_HP: 30,
-  MINION_ATK: { minion: 3, player: 5, tower: 3, base: 5 },
-  MINION_SPEED: 0.8, MINION_RANGE: 45, MINION_COOLDOWN: 80,
-  MINION_W: 18, MINION_H: 22,
-  PLAYER_W: 24, PLAYER_H: 34,
-  WAVE_INTERVAL: 1800,     // frames between waves (30s @60fps)
-  MINIONS_PER_WAVE: 3,
-  SYNC_INTERVAL_HOST: 6,   // sync every N frames (~10fps for state)
-  SYNC_INTERVAL_PLAYER: 3, // player pos sync
-  PROJ_LIFETIME: 120,
-  // Tower x positions [near, far] from each side
-  TOWER_X: { left:[250,520], right:[950,680] },
-  FPS: 60
-};
+const W=1200, H=440;
+const LANE_Y=[120,320], LANE_H=80;
+const BASE_W=60;
+const NEXUS_HP=100, TOWER_HP=20;
+const TOWER_X_L=[250,520], TOWER_X_R=[950,680];
+const TOWER_RANGE=160, TOWER_CD=70;
+const TOWER_DMG_M=15, TOWER_DMG_P=20;
+const MINION_HP=30, MINION_SPD=0.8, MINION_RNG=45, MINION_CD=80;
+const WAVE_INT=1800, WAVE_SIZE=3;
+const FPS=60;
 
 // ================================================================
-//  GLOBAL STATE
+//  ABLY STATE
 // ================================================================
-let db, roomRef, isHost=false, myId='', guestId='', roomId='';
-let myChar='', opponentChar='', myName='', opName='';
+let ably=null, channel=null;
+
+// ================================================================
+//  SESSION STATE
+// ================================================================
+let myId='', myName='', opName='';
+let myChar='', opChar='';
+let isHost=false, roomId='';
 let selectedChar='';
-let hostPlayerId=''; // the host's player ID (needed by guest to init game correctly)
-
-// LOCAL game state (host runs simulation; guest predicts self)
-let G = {
-  players: {},   // {[id]: PlayerObject}
-  minions: [],
-  towers: [],
-  nexus: { left:{hp:C.BASE_HP,maxHp:C.BASE_HP}, right:{hp:C.BASE_HP,maxHp:C.BASE_HP} },
-  projectiles: [],
-  particles: [],
-  floats: [],
-  wave: 0, waveTimer: C.WAVE_INTERVAL,
-  frame: 0, phase:'playing',
-  shake: 0
-};
-
-// Firebase state (latest snapshot from Firebase)
-let FB = { players:{}, minions:[], towers:[], nexus:null, wave:0, waveTimer:0, phase:'playing', frame:0 };
-
-// Keys currently held
-const keys = {};
-let lastKeys = {};
-
-// Cooldown trackers for local player
-let atkCool=0, ab1Cool=0, ab2Cool=0;
-
-// Canvas
-let canvas, ctx;
-let animId;
-let hostSyncTimer=0, playerSyncTimer=0;
 
 // ================================================================
-//  FIREBASE CONFIG
+//  GAME STATE (host is authoritative)
 // ================================================================
-function submitConfig() {
-  const raw = document.getElementById('cfg-json').value.trim();
-  const err = document.getElementById('cfg-err');
-  try {
-    const cfg = JSON.parse(raw);
-    if (!cfg.databaseURL) throw new Error('Missing "databaseURL" — add:\n"databaseURL": "https://YOUR-PROJECT-default-rtdb.firebaseio.com"');
-    const initDb = () => { db = firebase.database(); localStorage.setItem('lm_fbcfg', raw); err.textContent = ''; showScreen('lobby'); };
-    if (firebase.apps.length > 0) { firebase.apps[0].delete().then(() => { firebase.initializeApp(cfg); initDb(); }); }
-    else { firebase.initializeApp(cfg); initDb(); }
-  } catch(e) { err.textContent = '✗ ' + e.message; }
+let G={};
+function freshG(){
+  return {
+    players:{}, minions:[], towers:[], nexus:{L:{hp:NEXUS_HP,max:NEXUS_HP},R:{hp:NEXUS_HP,max:NEXUS_HP}},
+    projs:[], particles:[], floats:[],
+    wave:0, waveT:180, frame:0, phase:'playing', shake:0
+  };
 }
 
+// Input cooldowns (local only, not synced)
+let cdAtk=0, cdQ=0, cdE=0;
+const keys={};
+
+let canvas, ctx, animId=null;
+let minionId=0;
+
 // ================================================================
-//  SCREEN MANAGEMENT
+//  ABLY CONNECT
 // ================================================================
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById('screen-'+id).classList.add('active');
+function connectAbly(){
+  const key=document.getElementById('cfg-key').value.trim();
+  const err=document.getElementById('cfg-err');
+  if(!key){err.textContent='✗ Paste your API key first.';return;}
+  err.textContent='Connecting…';
+  try{
+    ably=new Ably.Realtime({key, closeOnUnload:true});
+    ably.connection.once('connected',()=>{
+      localStorage.setItem('lm_key',key);
+      err.textContent='';
+      showScreen('lobby');
+    });
+    ably.connection.once('failed',e=>{
+      err.textContent='✗ Connection failed — check your API key.';
+    });
+  }catch(e){err.textContent='✗ '+e.message;}
+}
+
+function resetConfig(){
+  localStorage.removeItem('lm_key');
+  if(ably) ably.close();
+  showScreen('config');
 }
 
 // ================================================================
 //  LOBBY
 // ================================================================
-function showJoin() {
-  document.getElementById('join-row').style.display = 'flex';
+function toggleJoin(){
+  const r=document.getElementById('join-row');
+  r.style.display=r.style.display==='none'?'flex':'none';
 }
 
-function createRoom() {
-  const name = document.getElementById('player-name').value.trim().toUpperCase() || 'PLAYER1';
-  myName = name;
-  myId = Math.random().toString(36).substr(2,9);
-  hostPlayerId = myId; // host tracks their own id
-  roomId = Math.random().toString(36).substr(2,6).toUpperCase();
-  isHost = true;
+function createRoom(){
+  const name=document.getElementById('pname').value.trim().toUpperCase()||'PLAYER1';
+  myName=name; myId=uid(); isHost=true;
+  roomId=Math.random().toString(36).substr(2,6).toUpperCase();
 
-  roomRef = db.ref('rooms/'+roomId);
-  roomRef.set({
-    host: myId, guest: '', hostName: name, guestName: '',
-    phase: 'lobby', hostChar: '', guestChar: ''
+  channel=ably.channels.get('lm:'+roomId);
+  channel.subscribe('join',msg=>{
+    const d=msg.data;
+    opName=d.name;
+    setLobbyStatus('⚔️ '+opName+' joined! Heading to character select…');
+    // Tell guest we received them
+    channel.publish('joined',{hostName:myName, hostId:myId});
+    setTimeout(()=>goCharSelect(),600);
   });
 
-  document.getElementById('room-code-display').style.display = 'block';
-  document.getElementById('room-code-display').textContent = roomId;
-  document.getElementById('lobby-wait').style.display = 'block';
-  setStatus('lobby','Room created! Share code: ' + roomId);
-
-  // Watch for guest joining
-  roomRef.child('guest').on('value', snap => {
-    if (snap.val() && snap.val() !== '') {
-      guestId = snap.val();
-      roomRef.child('guestName').once('value', s => {
-        opName = s.val() || 'PLAYER2';
-        setStatus('lobby', '⚔️ ' + opName + ' joined! Going to character select…');
-        setTimeout(() => goToCharSelect(), 800);
-      });
-    }
-  });
+  document.getElementById('room-code').style.display='block';
+  document.getElementById('room-code').textContent=roomId;
+  setLobbyStatus('Waiting for opponent…');
 }
 
-function joinRoom() {
-  const name = document.getElementById('player-name').value.trim().toUpperCase() || 'PLAYER2';
-  myName = name;
-  myId = Math.random().toString(36).substr(2,9);
-  const code = document.getElementById('join-code').value.trim().toUpperCase();
-  if (!code) { setStatus('lobby','Enter a room code!'); return; }
-  roomId = code;
-  isHost = false;
+function joinRoom(){
+  const name=document.getElementById('pname').value.trim().toUpperCase()||'PLAYER2';
+  myName=name; myId=uid(); isHost=false;
+  const code=document.getElementById('join-code').value.trim().toUpperCase();
+  if(!code){setLobbyStatus('Enter a room code!');return;}
+  roomId=code;
 
-  roomRef = db.ref('rooms/'+code);
-  roomRef.once('value', snap => {
-    const data = snap.val();
-    if (!data) { setStatus('lobby','Room not found!'); return; }
-    if (data.guest) { setStatus('lobby','Room is full!'); return; }
-    hostPlayerId = data.host; // ← store the host's player ID
-    guestId = myId;           // guest's own ID
-    opName = data.hostName || 'HOST';
+  channel=ably.channels.get('lm:'+roomId);
 
-    roomRef.update({ guest: myId, guestName: name });
-    setStatus('lobby','Joined! Going to character select…');
-    setTimeout(() => goToCharSelect(), 600);
+  // Wait for host to confirm
+  channel.subscribe('joined',msg=>{
+    opName=msg.data.hostName;
+    setLobbyStatus('Joined! Going to character select…');
+    // Tell host our char later in char select
+    setTimeout(()=>goCharSelect(),600);
   });
+
+  // Announce ourselves
+  channel.publish('join',{name:myName, id:myId});
+  setLobbyStatus('Connecting to room '+code+'…');
 }
 
-function setStatus(screen, msg) {
-  const el = document.getElementById(screen+'-status') || document.getElementById('lobby-status');
-  if(el) el.textContent = msg;
+function setLobbyStatus(msg){
+  document.getElementById('lobby-status').textContent=msg;
 }
 
 // ================================================================
 //  CHARACTER SELECT
 // ================================================================
-function goToCharSelect() {
+function goCharSelect(){
   buildCharGrid();
   showScreen('charselect');
-  // Watch opponent selection
-  const field = isHost ? 'guestChar' : 'hostChar';
-  roomRef.child(field).on('value', snap => {
-    if(snap.val()) {
-      opponentChar = snap.val();
-      document.getElementById('char-select-status').textContent =
-        opName + ' picked ' + CHARACTERS[opponentChar].name + '! ' +
-        (myChar ? 'Waiting for you…' : 'Now pick yours!');
+
+  // Listen for opponent's character lock
+  channel.subscribe('char-lock',msg=>{
+    if(msg.data.id!==myId){
+      opChar=msg.data.char;
+      const n=CHARS[opChar]?.name||opChar;
+      setCsStatus((opName||'Opponent')+' picked '+n+'!'+(myChar?' Waiting…':' Now pick yours!'));
+      tryStartGame();
     }
   });
 }
 
-function buildCharGrid() {
-  const grid = document.getElementById('char-grid');
-  grid.innerHTML = '';
-  Object.entries(CHARACTERS).forEach(([key, ch]) => {
-    const card = document.createElement('div');
-    card.className = 'char-card';
-    card.innerHTML = `
-      <div class="cicon">${ch.emoji}</div>
-      <div class="cname">${ch.name}</div>
-      <div class="cstats">
-        HP: ${ch.stats.maxHp} | SPD: ${ch.stats.speed}<br>
-        ATK: ${ch.stats.atk} | RNG: ${ch.stats.range}
-      </div>
-      <div class="cdesc">${ch.description}</div>
-      <div class="cdesc" style="margin-top:4px;color:#f0b840">
-        Q: ${ch.ability1.name}<br>E: ${ch.ability2.name}
-      </div>`;
-    card.onclick = () => {
-      document.querySelectorAll('.char-card').forEach(c=>c.classList.remove('selected'));
-      card.classList.add('selected');
-      selectedChar = key;
-      document.getElementById('lock-btn').style.display = 'block';
+function buildCharGrid(){
+  const g=document.getElementById('char-grid');
+  g.innerHTML='';
+  Object.entries(CHARS).forEach(([k,c])=>{
+    const el=document.createElement('div');
+    el.className='char-card';
+    el.innerHTML=`<div class="ci">${c.emoji}</div><div class="cn">${c.name}</div>
+      <div class="cs">HP:${c.stats.maxHp} SPD:${c.stats.speed}<br>ATK:${c.stats.atk} RNG:${c.stats.range}</div>
+      <div class="cd">${c.desc}</div>
+      <div class="cd" style="color:#f0b840;margin-top:4px">Q:${c.q.name} / E:${c.e.name}</div>`;
+    el.onclick=()=>{
+      document.querySelectorAll('.char-card').forEach(x=>x.classList.remove('selected'));
+      el.classList.add('selected');
+      selectedChar=k;
+      document.getElementById('lock-btn').style.display='block';
     };
-    grid.appendChild(card);
+    g.appendChild(el);
   });
 }
 
-function lockCharacter() {
-  if (!selectedChar) return;
-  myChar = selectedChar;
-  const field = isHost ? 'hostChar' : 'guestChar';
-  roomRef.update({ [field]: myChar });
-  document.getElementById('char-select-status').textContent =
-    'You locked in ' + CHARACTERS[myChar].name + '! Waiting for ' + opName + '…';
-  document.getElementById('lock-btn').style.display='none';
+function setCsStatus(m){document.getElementById('cs-status').textContent=m;}
 
-  // Watch for both locked
-  roomRef.on('value', snap => {
-    const d = snap.val();
-    if (d.hostChar && d.guestChar) {
-      roomRef.off();
-      opponentChar = isHost ? d.guestChar : d.hostChar;
-      startGame();
-    }
-  });
+function lockChar(){
+  if(!selectedChar) return;
+  myChar=selectedChar;
+  document.getElementById('lock-btn').disabled=true;
+  setCsStatus('Locked in '+CHARS[myChar].name+'! Waiting for '+(opName||'opponent')+'…');
+  channel.publish('char-lock',{id:myId, char:myChar, name:myName});
+  tryStartGame();
+}
+
+function tryStartGame(){
+  if(myChar && opChar) startGame();
 }
 
 // ================================================================
-//  GAME INIT
+//  GAME START
 // ================================================================
-function startGame() {
+function startGame(){
+  // Unsubscribe char-lock listener
+  channel.unsubscribe('char-lock');
+  channel.unsubscribe('join');
+  channel.unsubscribe('joined');
+
   showScreen('game');
   document.getElementById('hud').classList.add('active');
 
-  canvas = document.getElementById('game-canvas');
-  canvas.width = C.W; canvas.height = C.H;
-  ctx = canvas.getContext('2d');
+  canvas=document.getElementById('gc');
+  canvas.width=W; canvas.height=H;
+  ctx=canvas.getContext('2d');
+  fitCanvas();
+  window.addEventListener('resize',fitCanvas);
 
-  // Scale canvas to fit viewport
-  scaleCanvas();
-  window.addEventListener('resize', scaleCanvas);
+  G=freshG();
+  initPlayers();
+  initTowers();
+  setupKeys();
+  setupHUDLabels();
 
-  initGame();
-  setupInput();
-  setupHUD();
-
-  if (isHost) {
-    setupHostSync();
+  if(isHost){
+    setupHostNet();
   } else {
-    setupGuestSync();
+    setupGuestNet();
   }
 
-  requestAnimationFrame(gameLoop);
+  if(animId) cancelAnimationFrame(animId);
+  animId=requestAnimationFrame(loop);
 }
 
-function scaleCanvas() {
-  const maxW = window.innerWidth;
-  const maxH = window.innerHeight - 50; // hud height
-  const scale = Math.min(maxW / C.W, maxH / C.H, 1.2);
-  canvas.style.width = (C.W * scale) + 'px';
-  canvas.style.height = (C.H * scale) + 'px';
+function fitCanvas(){
+  const s=Math.min(window.innerWidth/W,(window.innerHeight-50)/H,1.3);
+  canvas.style.width=(W*s)+'px';
+  canvas.style.height=(H*s)+'px';
 }
 
-function initGame() {
-  // Host is always left team, guest is always right team.
-  // Both sides need consistent IDs — hostPlayerId is shared via Firebase.
-  const leftId   = hostPlayerId;
-  const rightId  = guestId;
-  const leftChar  = isHost ? myChar : opponentChar;
-  const rightChar = isHost ? opponentChar : myChar;
+function initPlayers(){
+  // Host = left (blue), Guest = right (red)
+  // Both clients agree on team by role, not ID ordering
+  const leftChar  = isHost ? myChar : opChar;
+  const rightChar = isHost ? opChar : myChar;
   const leftName  = isHost ? myName : opName;
-  const rightName = isHost ? opName : myName;
+  const rightName = isHost ? opName  : myName;
+  const leftId    = isHost ? myId : 'host';
+  const rightId   = isHost ? 'guest' : myId;
 
-  G.players[leftId]  = makePlayer(leftId,  leftChar,  'left',  leftName);
-  G.players[rightId] = makePlayer(rightId, rightChar, 'right', rightName);
-
-  G.towers = [];
-  // 1 tower per lane per team
-  for(let lane=0; lane<2; lane++){
-    G.towers.push({id:`tl${lane}`, team:'left',  lane, x:C.TOWER_X.left[0],  hp:C.TOWER_HP, maxHp:C.TOWER_HP, cooldown:0});
-    G.towers.push({id:`tr${lane}`, team:'right', lane, x:C.TOWER_X.right[0], hp:C.TOWER_HP, maxHp:C.TOWER_HP, cooldown:0});
-    // Second towers (inner)
-    G.towers.push({id:`tl${lane}b`, team:'left',  lane, x:C.TOWER_X.left[1],  hp:C.TOWER_HP, maxHp:C.TOWER_HP, cooldown:0});
-    G.towers.push({id:`tr${lane}b`, team:'right', lane, x:C.TOWER_X.right[1], hp:C.TOWER_HP, maxHp:C.TOWER_HP, cooldown:0});
-  }
-
-  G.nexus = { left:{hp:C.BASE_HP,maxHp:C.BASE_HP}, right:{hp:C.BASE_HP,maxHp:C.BASE_HP} };
-  G.minions = [];
-  G.projectiles = [];
-  G.particles = [];
-  G.floats = [];
-  G.wave = 0; G.waveTimer = 180; // first wave in 3s
-  G.frame = 0; G.phase = 'playing';
-  G.shake = 0;
+  G.players.host  = makePlayer('host',  leftChar,  'L', leftName);
+  G.players.guest = makePlayer('guest', rightChar, 'R', rightName);
 }
 
-function makePlayer(id, charKey, team, name) {
-  const ch = CHARACTERS[charKey];
-  const x = team==='left' ? 110 : C.W-110;
-  return {
-    id, charKey, team, name,
-    x, y: C.LANE_Y[0], lane:0,
-    hp: ch.stats.maxHp, maxHp: ch.stats.maxHp,
-    speed: ch.stats.speed, atk: ch.stats.atk,
-    range: ch.stats.range, cooldown: ch.stats.cooldown,
-    atkTimer:0, laneSwitch:0,
-    rageTimer:0, invisible:0, evasion:0, evasionTimer:0, slowTimer:0, stunTimer:0,
-    facing: team==='left'?1:-1,
-    state:'idle', dead:false
-  };
+function makePlayer(id,charKey,team,name){
+  const c=CHARS[charKey];
+  return{id,charKey,team,name,
+    x:team==='L'?110:W-110, y:LANE_Y[0], lane:0,
+    hp:c.stats.maxHp, maxHp:c.stats.maxHp,
+    speed:c.stats.speed, atk:c.stats.atk,
+    range:c.stats.range, atkCd:c.stats.cd,
+    atkT:0, laneT:0,
+    rageT:0, invis:0, evade:0, evadeT:0, slowT:0, stunT:0,
+    facing:team==='L'?1:-1,
+    dead:false, respawnT:0, flash:0, flashCol:'#fff'};
 }
 
-// ================================================================
-//  FIREBASE SYNC
-// ================================================================
-function setupHostSync() {
-  // Read guest player state from Firebase
-  db.ref('rooms/'+roomId+'/gplayer').on('value', snap => {
-    if(snap.val()) FB.gplayer = snap.val();
-  });
-  // Read guest attack events
-  db.ref('rooms/'+roomId+'/gevents').on('child_added', snap => {
-    const ev = snap.val();
-    if(ev && G.frame > 0) processGuestEvent(ev);
-    snap.ref.remove();
-  });
-}
-
-function setupGuestSync() {
-  // Read full game state from host
-  db.ref('rooms/'+roomId+'/state').on('value', snap => {
-    if(snap.val()) applyHostState(snap.val());
-  });
-}
-
-function applyHostState(data) {
-  // Update everything EXCEPT our own player (use local prediction)
-  FB = data;
-  if(!isHost) {
-    // Sync minions, towers, nexus from host
-    G.minions = data.minions || [];
-    G.towers = data.towers || G.towers;
-    if(data.nexus) G.nexus = data.nexus;
-    G.wave = data.wave || 0;
-    G.waveTimer = data.waveTimer || 0;
-    G.phase = data.phase || 'playing';
-    // Update opponent (host) player from Firebase state
-    const hostId = hostPlayerId;
-    if(hostId && data.players && data.players[hostId]) {
-      if(!G.players[hostId]) G.players[hostId] = data.players[hostId];
-      else Object.assign(G.players[hostId], data.players[hostId]);
-    }
-    // Check win
-    if(data.phase !== 'playing') handleWin(data.phase);
-  }
-}
-
-function processGuestEvent(ev) {
-  if(!isHost) return;
-  const p = G.players[guestId];
-  if(!p || p.dead) return;
-  if(ev.type === 'attack') {
-    doAttack(p, G);
-  } else if(ev.type === 'ability1') {
-    const ch = CHARACTERS[p.charKey];
-    ch.ability1.fn(p, G);
-  } else if(ev.type === 'ability2') {
-    const ch = CHARACTERS[p.charKey];
-    ch.ability2.fn(p, G);
-  } else if(ev.type === 'move') {
-    // Apply position from guest
-    p.x = ev.x; p.lane = ev.lane;
-    p.y = C.LANE_Y[p.lane];
-    p.facing = ev.facing;
+function initTowers(){
+  G.towers=[];
+  for(let lane=0;lane<2;lane++){
+    ['L','R'].forEach(team=>{
+      const xs = team==='L' ? TOWER_X_L : TOWER_X_R;
+      xs.forEach((x,i)=>{
+        G.towers.push({id:`t${team}${lane}${i}`,team,lane,x,hp:TOWER_HP,maxHp:TOWER_HP,cd:0});
+      });
+    });
   }
 }
 
 // ================================================================
-//  INPUT
+//  ABLY NETWORKING
 // ================================================================
-function setupInput() {
-  document.addEventListener('keydown', e => {
-    if(!keys[e.code]) {
-      keys[e.code] = true;
-      handleKeyPress(e.code);
+function myPid(){ return isHost ? 'host' : 'guest'; }
+function opPid(){ return isHost ? 'guest' : 'host'; }
+
+function setupHostNet(){
+  // Receive guest inputs
+  channel.subscribe('input',msg=>{
+    const d=msg.data;
+    const gp=G.players.guest;
+    if(!gp||gp.dead) return;
+    if(d.type==='move'){
+      gp.x=d.x; gp.lane=d.lane; gp.facing=d.facing;
+      gp.y=LANE_Y[gp.lane];
+    } else if(d.type==='atk'){
+      doAtk(gp,G);
+    } else if(d.type==='q'){
+      CHARS[gp.charKey].q.fn(gp,G);
+    } else if(d.type==='e'){
+      CHARS[gp.charKey].e.fn(gp,G);
     }
   });
-  document.addEventListener('keyup', e => { keys[e.code] = false; });
 }
 
-function handleKeyPress(code) {
-  const p = getMyPlayer();
-  if(!p || p.dead || G.phase !== 'playing') return;
+function setupGuestNet(){
+  // Receive host's full game state
+  channel.subscribe('state',msg=>{
+    applyState(msg.data);
+  });
+}
 
-  if(code==='KeyJ' || code==='Space') {
-    if(atkCool <= 0) {
-      atkCool = p.cooldown;
-      if(isHost) doAttack(p, G);
-      else sendGuestEvent({type:'attack'});
-    }
-  }
-  if(code==='KeyQ') {
-    if(ab1Cool <= 0) {
-      const ch = CHARACTERS[p.charKey];
-      ab1Cool = ch.ability1.cooldown;
-      if(isHost) ch.ability1.fn(p, G);
-      else sendGuestEvent({type:'ability1'});
-    }
-  }
-  if(code==='KeyE') {
-    if(ab2Cool <= 0) {
-      const ch = CHARACTERS[p.charKey];
-      ab2Cool = ch.ability2.cooldown;
-      if(isHost) ch.ability2.fn(p, G);
-      else sendGuestEvent({type:'ability2'});
-    }
+let stateTimer=0;
+function broadcastState(){
+  stateTimer++;
+  if(!isHost||stateTimer<3) return; // ~20fps
+  stateTimer=0;
+  channel.publish('state',{
+    players:{
+      host: pickPlayerState(G.players.host),
+      guest: pickPlayerState(G.players.guest)
+    },
+    minions: G.minions.map(m=>({id:m.id,x:m.x,lane:m.lane,hp:m.hp,maxHp:m.maxHp,team:m.team})),
+    towers:  G.towers.map(t=>({id:t.id,x:t.x,lane:t.lane,hp:t.hp,team:t.team})),
+    nexus:   G.nexus,
+    wave:    G.wave,
+    waveT:   G.waveT,
+    phase:   G.phase
+  });
+}
+
+function pickPlayerState(p){
+  if(!p) return null;
+  return{x:p.x,y:p.y,lane:p.lane,hp:p.hp,maxHp:p.maxHp,facing:p.facing,
+    dead:p.dead,invis:p.invis,rageT:p.rageT,charKey:p.charKey,name:p.name};
+}
+
+let inputTimer=0;
+function broadcastInput(){
+  inputTimer++;
+  if(isHost||inputTimer<2) return; // ~30fps for movement
+  inputTimer=0;
+  const p=G.players[myPid()];
+  if(!p) return;
+  channel.publish('input',{type:'move',x:p.x,lane:p.lane,facing:p.facing});
+}
+
+function sendAction(type){
+  if(isHost){
+    // Host executes locally
+    const p=G.players.host;
+    if(type==='atk') doAtk(p,G);
+    else if(type==='q') CHARS[p.charKey].q.fn(p,G);
+    else if(type==='e') CHARS[p.charKey].e.fn(p,G);
+  } else {
+    channel.publish('input',{type});
   }
 }
 
-function sendGuestEvent(ev) {
-  db.ref('rooms/'+roomId+'/gevents').push(ev);
+function applyState(data){
+  if(isHost) return;
+  // Apply everything EXCEPT our own player's position (local prediction)
+  const myPl = G.players[myPid()];
+  G.minions = data.minions||[];
+  G.minions.forEach(m=>{ m.y=LANE_Y[m.lane]; });
+  G.towers = data.towers||G.towers;
+  G.towers.forEach(t=>{ /* keep existing y */ });
+  if(data.nexus) G.nexus=data.nexus;
+  G.wave=data.wave||0;
+  G.waveT=data.waveT||0;
+  G.phase=data.phase||'playing';
+
+  // Update host player
+  if(data.players?.host && G.players.host){
+    const hp=data.players.host;
+    Object.assign(G.players.host,hp);
+    G.players.host.y=LANE_Y[G.players.host.lane||0];
+  }
+  // Update our own HP from authoritative state (but keep our x/y)
+  if(data.players?.[myPid()] && myPl){
+    const ap=data.players[myPid()];
+    myPl.hp=ap.hp; myPl.maxHp=ap.maxHp; myPl.dead=ap.dead;
+    myPl.invis=ap.invis; myPl.rageT=ap.rageT;
+  }
+  if(data.phase!=='playing') showWin(data.phase);
 }
 
 // ================================================================
-//  GAME LOOP
+//  MAIN LOOP
 // ================================================================
-function gameLoop() {
-  animId = requestAnimationFrame(gameLoop);
+function loop(){
+  animId=requestAnimationFrame(loop);
   G.frame++;
 
   // Tick local cooldowns
-  if(atkCool > 0) atkCool--;
-  if(ab1Cool > 0) ab1Cool--;
-  if(ab2Cool > 0) ab2Cool--;
+  if(cdAtk>0) cdAtk--;
+  if(cdQ>0) cdQ--;
+  if(cdE>0) cdE--;
 
-  const me = getMyPlayer();
-  if(me && !me.dead) {
-    // Movement (both clients move their own player locally)
-    movePlayer(me, keys);
-    me.y = C.LANE_Y[me.lane];
+  // Handle input
+  handleMovement();
+  handleActionKeys();
 
-    // Lane switch W/S
-    if((keys['KeyW']||keys['ArrowUp']) && me.laneSwitch<=0) {
-      if(me.lane>0){ me.lane--; me.laneSwitch=20; }
-    }
-    if((keys['KeyS']||keys['ArrowDown']) && me.laneSwitch<=0) {
-      if(me.lane<1){ me.lane++; me.laneSwitch=20; }
-    }
-    if(me.laneSwitch>0) me.laneSwitch--;
+  if(isHost) hostTick();
+  tickParticles();
 
-    // Sync player to Firebase
-    playerSyncTimer++;
-    if(playerSyncTimer >= C.SYNC_INTERVAL_PLAYER) {
-      playerSyncTimer = 0;
-      const field = isHost ? 'hplayer' : 'gplayer';
-      db.ref('rooms/'+roomId+'/'+field).set({
-        x:me.x, lane:me.lane, hp:me.hp, maxHp:me.maxHp,
-        facing:me.facing, state:me.state, charKey:me.charKey
-      });
-      if(!isHost) {
-        // Also send move event so host can update position
-        sendGuestEvent({type:'move', x:me.x, lane:me.lane, facing:me.facing});
-      }
-    }
-  }
-
-  if(isHost) {
-    hostUpdate();
-  } else {
-    guestUpdate();
-  }
+  // Networking
+  broadcastState();
+  broadcastInput();
 
   render();
   updateHUD();
 }
 
-function movePlayer(p, k) {
-  if(p.stunTimer > 0) { p.stunTimer--; return; }
-  if(p.slowTimer > 0) { p.slowTimer--; }
-  const spd = p.speed * (p.slowTimer > 0 ? 0.5 : 1) * (p.rageTimer > 0 ? 1.2 : 1);
-  const left  = k['KeyA']||k['ArrowLeft'];
-  const right = k['KeyR']||k['KeyD']||k['ArrowRight'];
-  if(left)  { p.x -= spd; p.facing = -1; }
-  if(right) { p.x += spd; p.facing =  1; }
-  // Clamp to map
-  p.x = Math.max(C.PLAYER_W/2, Math.min(C.W - C.PLAYER_W/2, p.x));
-}
-
 // ================================================================
-//  HOST SIMULATION (only runs on host)
+//  INPUT HANDLING
 // ================================================================
-function hostUpdate() {
-  // Apply guest player position from Firebase
-  if(FB.gplayer && G.players[guestId]) {
-    const gp = G.players[guestId];
-    Object.assign(gp, FB.gplayer);
-    gp.y = C.LANE_Y[gp.lane||0];
-  }
-
-  // Tick timers
-  for(const p of Object.values(G.players)) {
-    if(p.rageTimer>0) p.rageTimer--;
-    if(p.invisible>0) p.invisible--;
-    if(p.evasionTimer>0) { p.evasionTimer--; if(p.evasionTimer<=0) p.evasion=0; }
-  }
-
-  // Waves
-  G.waveTimer--;
-  if(G.waveTimer <= 0) {
-    G.waveTimer = C.WAVE_INTERVAL;
-    G.wave++;
-    spawnWave();
-  }
-
-  updateMinions();
-  updateTowers();
-  updateProjectiles();
-  updateParticles();
-  checkNexus();
-  checkWinCondition();
-
-  // Sync to Firebase
-  hostSyncTimer++;
-  if(hostSyncTimer >= C.SYNC_INTERVAL_HOST) {
-    hostSyncTimer = 0;
-    syncHostStateToFirebase();
-  }
-}
-
-function guestUpdate() {
-  // Guest just simulates particles locally
-  updateParticles();
-}
-
-function syncHostStateToFirebase() {
-  const data = {
-    frame: G.frame,
-    phase: G.phase,
-    wave: G.wave,
-    waveTimer: G.waveTimer,
-    nexus: G.nexus,
-    minions: G.minions.map(serializeMinion),
-    towers: G.towers.map(serializeTower),
-    players: {}
-  };
-  for(const [id, p] of Object.entries(G.players)) {
-    data.players[id] = {x:p.x, y:p.y, lane:p.lane, hp:p.hp, maxHp:p.maxHp,
-      facing:p.facing, state:p.state, charKey:p.charKey, dead:p.dead,
-      invisible:p.invisible};
-  }
-  db.ref('rooms/'+roomId+'/state').set(data);
-}
-
-function serializeMinion(m) {
-  return {id:m.id, x:m.x, lane:m.lane, hp:m.hp, maxHp:m.maxHp, team:m.team, state:m.state};
-}
-function serializeTower(t) {
-  return {id:t.id, x:t.x, lane:t.lane, hp:t.hp, maxHp:t.maxHp, team:t.team};
-}
-
-// ================================================================
-//  WAVE / MINIONS
-// ================================================================
-function spawnWave() {
-  for(let lane=0; lane<2; lane++) {
-    for(let i=0; i<C.MINIONS_PER_WAVE; i++) {
-      G.minions.push(makeMinion('left',  lane, i));
-      G.minions.push(makeMinion('right', lane, i));
+function setupKeys(){
+  document.addEventListener('keydown',e=>{
+    if(!keys[e.code]){
+      keys[e.code]=true;
+      onKeyPress(e.code);
     }
+    // Prevent arrow key scrolling
+    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+  });
+  document.addEventListener('keyup',e=>{ keys[e.code]=false; });
+}
+
+function onKeyPress(code){
+  if(G.phase!=='playing') return;
+  const p=G.players[myPid()];
+  if(!p||p.dead) return;
+  if((code==='KeyJ'||code==='Space') && cdAtk<=0){
+    cdAtk=p.atkCd; sendAction('atk');
+  }
+  if(code==='KeyQ' && cdQ<=0){
+    cdQ=CHARS[p.charKey].q.cd; sendAction('q');
+  }
+  if(code==='KeyE' && cdE<=0){
+    cdE=CHARS[p.charKey].e.cd; sendAction('e');
   }
 }
 
-let minionIdCounter = 0;
-function makeMinion(team, lane, offset) {
-  const x = team==='left' ? C.BASE_X_L + C.BASE_W + 10 + offset*22 :
-                            C.BASE_X_R - 10 - offset*22;
-  return {
-    id: 'm'+(minionIdCounter++),
-    team, lane, x,
-    y: C.LANE_Y[lane],
-    hp: C.MINION_HP, maxHp: C.MINION_HP,
-    cooldown: 0, state:'march',
-    facing: team==='left'?1:-1
-  };
+function handleMovement(){
+  const p=G.players[myPid()];
+  if(!p||p.dead||G.phase!=='playing') return;
+  if(p.stunT>0){ p.stunT--; return; }
+
+  const spd=p.speed*(p.slowT>0?.5:1)*(p.rageT>0?1.2:1);
+  if(keys['KeyA']||keys['ArrowLeft'])  { p.x-=spd; p.facing=-1; }
+  if(keys['KeyD']||keys['ArrowRight']) { p.x+=spd; p.facing=1;  }
+  p.x=Math.max(20,Math.min(W-20,p.x));
+
+  // Lane switch
+  if((keys['KeyW']||keys['ArrowUp'])&&p.laneT<=0&&p.lane>0){ p.lane--; p.laneT=20; }
+  if((keys['KeyS']||keys['ArrowDown'])&&p.laneT<=0&&p.lane<1){ p.lane++; p.laneT=20; }
+  if(p.laneT>0) p.laneT--;
+  p.y=LANE_Y[p.lane];
 }
 
-function updateMinions() {
-  for(const m of G.minions) {
-    if(m.hp <= 0) continue;
-    if(m.cooldown > 0) { m.cooldown--; }
+function handleActionKeys(){
+  // Held-key cooldown ticks happen in main loop; press detection in onKeyPress
+}
 
-    // Find nearest enemy directly ahead
-    const enemy = nearestEnemyAhead(m);
-
-    if(enemy && distX(m,enemy) <= C.MINION_RANGE) {
-      // Attack
-      m.state = 'attack';
-      if(m.cooldown <= 0) {
-        m.cooldown = C.MINION_COOLDOWN;
-        const dmgType = enemy.maxHp === C.TOWER_HP ? 'tower' :
-                        enemy.maxHp === C.BASE_HP ? 'base' :
-                        (CHARACTERS[enemy.charKey] ? 'player' : 'minion');
-        const dmg = C.MINION_ATK[dmgType] || 3;
-        applyDamage(enemy, dmg, 'minion');
-        spawnParticles(enemy.x, enemy.y, '#f44', 3);
+// ================================================================
+//  HOST SIMULATION
+// ================================================================
+function hostTick(){
+  // Player timers
+  for(const p of Object.values(G.players)){
+    if(p.rageT>0) p.rageT--;
+    if(p.invis>0) p.invis--;
+    if(p.evadeT>0){ p.evadeT--; if(p.evadeT<=0) p.evade=0; }
+    if(p.slowT>0) p.slowT--;
+    if(p.stunT>0) p.stunT--;
+    if(p.flash>0) p.flash--;
+    // Respawn
+    if(p.dead){
+      p.respawnT--;
+      if(p.respawnT<=0){
+        p.dead=false; p.hp=p.maxHp;
+        p.x=p.team==='L'?110:W-110; p.lane=0; p.y=LANE_Y[0];
+        float(p,'RESPAWN','#2ecc71');
       }
-    } else if(enemy && distX(m,enemy) <= C.MINION_RANGE * 3) {
-      m.state = 'march'; // blocked but close
-      // march slowly toward
-      m.x += m.facing * C.MINION_SPEED;
+    }
+  }
+
+  // Wave
+  G.waveT--;
+  if(G.waveT<=0){ G.waveT=WAVE_INT; G.wave++; spawnWave(); }
+
+  tickMinions();
+  tickTowers();
+  tickProjs();
+  checkNexus();
+  checkWin();
+}
+
+// ================================================================
+//  WAVES & MINIONS
+// ================================================================
+function spawnWave(){
+  for(let lane=0;lane<2;lane++){
+    for(let i=0;i<WAVE_SIZE;i++){
+      G.minions.push(mkMinion('L',lane,i));
+      G.minions.push(mkMinion('R',lane,i));
+    }
+  }
+}
+
+function mkMinion(team,lane,off){
+  const x=team==='L'?BASE_W+12+off*22:W-BASE_W-12-off*22;
+  return{id:'m'+(minionId++),team,lane,x,y:LANE_Y[lane],
+    hp:MINION_HP,maxHp:MINION_HP,cd:0,facing:team==='L'?1:-1};
+}
+
+function tickMinions(){
+  for(const m of G.minions){
+    if(m.hp<=0) continue;
+    if(m.cd>0){ m.cd--; continue; }
+    const enemy=nearestAhead(m);
+    if(enemy&&distX(m,enemy)<=MINION_RNG){
+      m.cd=MINION_CD;
+      const dmg=MINION_HP/10; // 3 dmg
+      applyDmg(enemy,dmg);
+      particles(enemy.x,enemy.y,m.team==='L'?'#4af':'#f44',3);
     } else {
-      m.state = 'march';
-      m.x += m.facing * C.MINION_SPEED;
+      m.x+=m.facing*MINION_SPD;
     }
-
-    // Hit nexus directly
-    if(m.team==='left' && m.x >= C.BASE_X_R + 10) {
-      G.nexus.right.hp -= C.MINION_ATK.base;
-      G.nexus.right.hp = Math.max(0, G.nexus.right.hp);
-      m.hp = 0; // minion gone after reaching base
-    }
-    if(m.team==='right' && m.x <= C.BASE_X_L + C.BASE_W - 10) {
-      G.nexus.left.hp -= C.MINION_ATK.base;
-      G.nexus.left.hp = Math.max(0, G.nexus.left.hp);
-      m.hp = 0;
-    }
+    // Reach enemy nexus
+    if(m.team==='L'&&m.x>=W-BASE_W){ G.nexus.R.hp=Math.max(0,G.nexus.R.hp-5); m.hp=0; }
+    if(m.team==='R'&&m.x<=BASE_W)   { G.nexus.L.hp=Math.max(0,G.nexus.L.hp-5); m.hp=0; }
   }
-  // Remove dead
-  G.minions = G.minions.filter(m => m.hp > 0);
+  G.minions=G.minions.filter(m=>m.hp>0);
 }
 
-function nearestEnemyAhead(m) {
-  let nearest=null, nearestDist=Infinity;
-  const dir = m.facing;
-
-  // Check enemy minions
-  for(const other of G.minions) {
-    if(other.team === m.team || other.hp<=0 || other.lane!==m.lane) continue;
-    const dx = other.x - m.x;
-    if(Math.sign(dx) !== dir && dx!==0) continue; // not ahead
-    const d = Math.abs(dx);
-    if(d < nearestDist) { nearestDist=d; nearest=other; }
-  }
-  // Check enemy towers
-  for(const t of G.towers) {
-    if(t.team===m.team || t.hp<=0 || t.lane!==m.lane) continue;
-    const dx = t.x - m.x;
-    if(Math.sign(dx)!==dir && dx!==0) continue;
-    const d = Math.abs(dx);
-    if(d < nearestDist) { nearestDist=d; nearest=t; }
-  }
-  // Check enemy nexus
-  const nexusTeam = m.team==='left'?'right':'left';
-  const nexus = G.nexus[nexusTeam];
-  if(nexus.hp > 0) {
-    const nx = m.team==='left' ? C.BASE_X_R + 30 : C.BASE_X_L + 30;
-    const dx = nx - m.x;
-    if(Math.sign(dx)===dir) {
-      const d=Math.abs(dx);
-      if(d<nearestDist){nearestDist=d;nearest={...nexus,x:nx,y:m.y,id:'nexus_'+nexusTeam,_isNexus:nexusTeam};}
-    }
-  }
-
-  return nearest;
+function nearestAhead(m){
+  let best=null, bd=Infinity;
+  const dir=m.facing;
+  const check=(obj)=>{
+    if(!obj||obj.hp<=0) return;
+    if(obj.team===m.team) return;
+    if(obj.lane!==undefined&&obj.lane!==m.lane) return;
+    const dx=obj.x-m.x;
+    if(Math.sign(dx)!==dir&&dx!==0) return;
+    const d=Math.abs(dx);
+    if(d<bd){bd=d;best=obj;}
+  };
+  G.minions.forEach(check);
+  G.towers.forEach(check);
+  // Check nexus
+  const nTeam=m.team==='L'?'R':'L';
+  const nx=m.team==='L'?W-BASE_W+20:BASE_W-20;
+  const ndef={hp:G.nexus[nTeam].hp,maxHp:G.nexus[nTeam].max,x:nx,y:m.y,team:nTeam,lane:m.lane,_nexus:nTeam};
+  check(ndef);
+  return best;
 }
 
-function distX(a, b) { return Math.abs(a.x - b.x); }
+function distX(a,b){ return Math.abs(a.x-b.x); }
 
 // ================================================================
 //  TOWERS
 // ================================================================
-function updateTowers() {
-  for(const t of G.towers) {
-    if(t.hp <= 0) continue;
-    if(t.cooldown > 0) { t.cooldown--; continue; }
-
-    // Find nearest enemy in range (prioritize minions)
-    let target=null, targetDist=Infinity;
-    // Check enemy minions in lane
-    for(const m of G.minions) {
-      if(m.team===t.team || m.lane!==t.lane) continue;
-      const d = Math.abs(m.x-t.x);
-      if(d < C.TOWER_RANGE && d < targetDist) { targetDist=d; target=m; }
+function tickTowers(){
+  for(const t of G.towers){
+    if(t.hp<=0) continue;
+    if(t.cd>0){ t.cd--; continue; }
+    let target=null, td=Infinity;
+    // Minions first
+    for(const m of G.minions){
+      if(m.team===t.team||m.lane!==t.lane) continue;
+      const d=Math.abs(m.x-t.x);
+      if(d<TOWER_RANGE&&d<td){ td=d; target=m; }
     }
-    // Check enemy players in lane
-    if(!target) {
-      for(const p of Object.values(G.players)) {
-        if(p.team===t.team || p.dead || p.lane!==t.lane) continue;
-        const d = Math.abs(p.x-t.x);
-        if(d < C.TOWER_RANGE && d < targetDist) { targetDist=d; target=p; }
+    // Then players
+    if(!target){
+      for(const p of Object.values(G.players)){
+        if(p.team===t.team||p.dead||p.lane!==t.lane) continue;
+        const d=Math.abs(p.x-t.x);
+        if(d<TOWER_RANGE&&d<td){ td=d; target=p; }
       }
     }
-
-    if(target) {
-      t.cooldown = C.TOWER_COOLDOWN;
-      const isPlayer = !!target.charKey;
-      const dmg = isPlayer ? C.TOWER_ATK.player : C.TOWER_ATK.minion;
-      applyDamage(target, dmg, 'tower');
-      // Launch visual projectile from tower
-      G.projectiles.push({
-        id:'tp'+G.frame, x:t.x, y:C.LANE_Y[t.lane],
-        tx:target.x, ty:target.y,
-        vx:0, vy:0, speed:6, dmg:0, aoe:0,
-        team:t.team, targetId:target.id, type:'bolt',
-        color:t.team==='left'?'#4af':'#f44', lifetime:C.PROJ_LIFETIME,
-        visual:true // purely visual, damage already applied
-      });
-      spawnParticles(target.x, target.y, t.team==='left'?'#4af':'#f44', 4);
+    if(target){
+      t.cd=TOWER_CD;
+      const dmg=target.charKey?TOWER_DMG_P:TOWER_DMG_M;
+      applyDmg(target,dmg);
+      particles(target.x,target.y,t.team==='L'?'#4af':'#f44',5);
+      // Visual bolt
+      G.projs.push({x:t.x,y:LANE_Y[t.lane],tx:target.x,ty:target.y,
+        color:t.team==='L'?'#4af':'#f44',life:8,maxLife:8,visual:true});
     }
   }
 }
 
 // ================================================================
-//  COMBAT
+//  COMBAT HELPERS
 // ================================================================
-function doAttack(p, state) {
+function doAtk(p,G){
   if(p.dead) return;
-  const ch = CHARACTERS[p.charKey];
-  const range = ch.stats.range;
-  const dmg = p.atk * (p.rageTimer>0 ? 2 : 1);
-  const isRanged = range > 80;
-
-  if(isRanged) {
-    launchProjectile(p, state, {type:'arrow', dmg, aoe:0, speed:7, color:CHARACTERS[p.charKey].color});
-  } else {
-    meleeAbility(p, state, dmg, range);
-  }
-  p.state='attack';
-  spawnParticles(p.x + p.facing*20, p.y, CHARACTERS[p.charKey].color, 5);
+  const isRanged=p.range>80;
+  const dmg=p.atk*(p.rageT>0?2:1);
+  if(isRanged) shoot(p,G,dmg,0,7,CHARS[p.charKey].color);
+  else meleeAbility(p,G,dmg,p.range);
+  particles(p.x+p.facing*20,p.y,CHARS[p.charKey].color,5);
 }
 
-function meleeAbility(p, state, dmg, range) {
-  const hitX = p.x + p.facing * range * 0.6;
-  // Hit minions
-  for(const m of state.minions) {
-    if(m.team===p.team || m.lane!==p.lane) continue;
-    if(Math.abs(m.x-hitX)<range*0.7) applyDamage(m, dmg, 'player');
-  }
-  // Hit towers
-  for(const t of state.towers) {
-    if(t.team===p.team || t.lane!==p.lane) continue;
-    if(Math.abs(t.x-hitX)<range*0.7) applyDamage(t, dmg, 'player');
-  }
-  // Hit enemy player
-  for(const op of Object.values(state.players)) {
+function meleeAbility(p,G,dmg,range){
+  const hx=p.x+p.facing*range*.6;
+  for(const m of G.minions){ if(m.team!==p.team&&m.lane===p.lane&&Math.abs(m.x-hx)<range*.7) applyDmg(m,dmg); }
+  for(const t of G.towers){ if(t.team!==p.team&&t.lane===p.lane&&t.hp>0&&Math.abs(t.x-hx)<range*.7) applyDmg(t,dmg); }
+  for(const op of Object.values(G.players)){ if(op.id!==p.id&&op.team!==p.team&&!op.dead&&op.lane===p.lane&&Math.abs(op.x-hx)<range*.7) applyDmg(op,dmg); }
+  // Nexus hit
+  const nTeam=p.team==='L'?'R':'L';
+  const nx=p.team==='L'?W-BASE_W+20:BASE_W-20;
+  if(Math.abs(nx-hx)<range*1.2){ G.nexus[nTeam].hp=Math.max(0,G.nexus[nTeam].hp-dmg); float({x:nx,y:p.y},'-'+dmg,'#f44'); }
+  particles(hx,LANE_Y[p.lane],CHARS[p.charKey].color,6);
+}
+
+function fireball(p,G,dmg,aoe){ shoot(p,G,dmg,aoe,5,'#ff6a00'); }
+
+function shoot(p,G,dmg,aoe,spd,col,spread=0){
+  const vx=Math.cos(spread)*spd*p.facing;
+  const vy=Math.sin(spread)*spd;
+  G.projs.push({id:'p'+(minionId++),x:p.x+p.facing*22,y:p.y,lane:p.lane,
+    vx,vy,dmg,aoe,team:p.team,color:col,life:90,maxLife:90,visual:false});
+}
+
+function aoeHit(p,G,r,dmg,col){
+  for(const m of G.minions){ if(m.team!==p.team&&m.lane===p.lane&&Math.abs(m.x-p.x)<r) applyDmg(m,dmg); }
+  for(const op of Object.values(G.players)){ if(op.id!==p.id&&op.team!==p.team&&!op.dead&&op.lane===p.lane&&Math.abs(op.x-p.x)<r) applyDmg(op,dmg); }
+  particles(p.x,p.y,col||'#f0b840',12);
+}
+
+function aoeStatus(p,G,r,status,dur){
+  for(const op of Object.values(G.players)){
     if(op.id===p.id||op.team===p.team||op.dead||op.lane!==p.lane) continue;
-    if(Math.abs(op.x-hitX)<range*0.7) applyDamage(op, dmg, 'player');
+    if(Math.abs(op.x-p.x)<r){ if(status==='slow') op.slowT=dur; if(status==='stun') op.stunT=dur; }
   }
-  // Hit nexus
-  const nexusTeam = p.team==='left'?'right':'left';
-  const nx = p.team==='left' ? C.BASE_X_R+30 : C.BASE_X_L+30;
-  if(Math.abs(nx-hitX)<range*1.2) {
-    G.nexus[nexusTeam].hp = Math.max(0, G.nexus[nexusTeam].hp - dmg);
-    floatText({x:nx,y:C.LANE_Y[p.lane]}, '-'+dmg, '#f44');
-  }
-  spawnParticles(hitX, C.LANE_Y[p.lane], CHARACTERS[p.charKey].color, 6);
 }
 
-function aoeAbility(p, state, radius, dmg, color) {
-  for(const m of state.minions) {
-    if(m.team===p.team||m.lane!==p.lane) continue;
-    if(Math.abs(m.x-p.x)<radius) applyDamage(m, dmg, 'ability');
-  }
-  for(const op of Object.values(state.players)) {
+function dashStrike(p,G,dist,dmg){
+  p.x+=p.facing*dist; p.x=Math.max(20,Math.min(W-20,p.x));
+  meleeAbility(p,G,dmg,60); particles(p.x,p.y,CHARS[p.charKey].color,8);
+}
+
+function blinkStrike(p,G,maxDist,dmg){
+  let nearest=null, nd=Infinity;
+  for(const op of Object.values(G.players)){
     if(op.id===p.id||op.team===p.team||op.dead||op.lane!==p.lane) continue;
-    if(Math.abs(op.x-p.x)<radius) applyDamage(op, dmg, 'ability');
+    const d=(op.x-p.x)*p.facing;
+    if(d>0&&d<maxDist&&d<nd){nd=d;nearest=op;}
   }
-  spawnParticles(p.x, p.y, color||'#f0b840', 12);
+  if(nearest){ p.x=nearest.x-p.facing*38; applyDmg(nearest,dmg); particles(nearest.x,nearest.y,'#c0392b',10); }
+  else{ p.x+=p.facing*maxDist; p.x=Math.max(20,Math.min(W-20,p.x)); }
 }
 
-function dashAbility(p, state, dist, dmg) {
-  p.x += p.facing * dist;
-  p.x = Math.max(C.PLAYER_W/2, Math.min(C.W-C.PLAYER_W/2, p.x));
-  meleeAbility(p, state, dmg, 60);
-  spawnParticles(p.x, p.y, CHARACTERS[p.charKey].color, 8);
-}
-
-function blinkStrike(p, state, dist, dmg) {
-  // Find nearest enemy ahead
-  let nearestEnemy=null, nearestDist=Infinity;
-  for(const op of Object.values(state.players)) {
+function drain(p,G,amount){
+  for(const op of Object.values(G.players)){
     if(op.id===p.id||op.team===p.team||op.dead||op.lane!==p.lane) continue;
-    const d = (op.x-p.x)*p.facing;
-    if(d>0 && d<dist && d<nearestDist){nearestDist=d;nearestEnemy=op;}
+    if(Math.abs(op.x-p.x)<130){ applyDmg(op,amount); p.hp=Math.min(p.maxHp,p.hp+amount); float(p,'+'+amount,'#2ecc71'); return; }
   }
-  if(nearestEnemy) {
-    p.x = nearestEnemy.x - p.facing * 40;
-    applyDamage(nearestEnemy, dmg, 'ability');
-    spawnParticles(nearestEnemy.x, nearestEnemy.y, '#c0392b', 10);
-  } else {
-    p.x += p.facing * dist;
-    p.x = Math.max(C.PLAYER_W/2, Math.min(C.W-C.PLAYER_W/2, p.x));
-  }
-  flashEffect(p, '#c0392b', 6);
+  float(p,'MISS','#aaa');
 }
 
-function drainAbility(p, state, amount) {
-  let drained = false;
-  for(const op of Object.values(state.players)) {
-    if(op.id===p.id||op.team===p.team||op.dead||op.lane!==p.lane) continue;
-    if(Math.abs(op.x-p.x) < 120) {
-      applyDamage(op, amount, 'ability');
-      p.hp = Math.min(p.maxHp, p.hp + amount);
-      floatText(p, '+'+amount, '#2ecc71');
-      drained=true; break;
-    }
-  }
-  if(!drained) floatText(p, 'MISS', '#aaa');
+function spawnSummon(p,G){
+  G.minions.push({id:'s'+(minionId++),team:p.team,lane:p.lane,
+    x:p.x+p.facing*30, y:LANE_Y[p.lane],
+    hp:MINION_HP*2,maxHp:MINION_HP*2,cd:0,facing:p.facing,summon:true});
+  float(p,'ARISE!','#8e44ad');
 }
 
-function applyStatusToArea(p, state, radius, status, duration) {
-  for(const op of Object.values(state.players)) {
-    if(op.id===p.id||op.team===p.team||op.dead||op.lane!==p.lane) continue;
-    if(Math.abs(op.x-p.x)<radius) {
-      if(status==='slow') op.slowTimer=duration;
-      if(status==='stun') op.stunTimer=duration;
-    }
-  }
-  for(const m of state.minions) {
-    if(m.team===p.team||m.lane!==p.lane) continue;
-    if(Math.abs(m.x-p.x)<radius) {
-      if(status==='slow') m.slow = duration;
-    }
-  }
+function applyDmg(target,dmg){
+  if(!target||target.hp===undefined) return;
+  // _nexus targets are handled specially
+  if(target._nexus){ G.nexus[target._nexus].hp=Math.max(0,G.nexus[target._nexus].hp-dmg); return; }
+  if(target.evade&&Math.random()<target.evade){ float(target,'DODGE','#fff'); return; }
+  target.hp=Math.max(0,target.hp-dmg);
+  float(target,'-'+Math.ceil(dmg),'#f88');
+  if(target.hp<=0&&target.charKey){ target.dead=true; target.respawnT=300; }
 }
 
-function spawnSummonedMinion(p, state) {
-  state.minions.push({
-    id: 'sum'+(minionIdCounter++),
-    team:p.team, lane:p.lane,
-    x: p.x + p.facing*30, y: C.LANE_Y[p.lane],
-    hp: C.MINION_HP*2, maxHp:C.MINION_HP*2,
-    cooldown:0, state:'march',
-    facing:p.facing,
-    summoned:true
-  });
-}
-
-function launchProjectile(p, state, opts) {
-  const angle = opts.spread || 0;
-  const vx = Math.cos(angle) * opts.speed * p.facing;
-  const vy = Math.sin(angle) * opts.speed;
-  state.projectiles.push({
-    id:'p'+Math.random().toString(36).substr(2,6),
-    x: p.x + p.facing*20, y: p.y,
-    lane: p.lane,
-    vx, vy, speed: opts.speed,
-    team: p.team, dmg: opts.dmg, aoe: opts.aoe||0,
-    type: opts.type, color: opts.color,
-    lifetime: C.PROJ_LIFETIME, visual:false
-  });
-}
-
-function updateProjectiles() {
-  for(const proj of G.projectiles) {
-    proj.lifetime--;
-    if(proj.lifetime<=0||proj.visual) { proj.lifetime=0; continue; }
-    proj.x += proj.vx;
-    proj.y += proj.vy;
-
-    // Check hits
-    let hit = false;
-    // Enemy minions in same lane
-    for(const m of G.minions) {
-      if(m.team===proj.team||m.lane!==proj.lane) continue;
-      if(Math.abs(m.x-proj.x)<20 && Math.abs(m.y-proj.y)<20) {
-        applyDamage(m, proj.dmg, 'projectile');
-        if(proj.aoe>0) {
-          for(const m2 of G.minions){
-            if(m2.team===proj.team||m2.id===m.id) continue;
-            if(Math.abs(m2.x-proj.x)<proj.aoe) applyDamage(m2, Math.floor(proj.dmg*0.6),'aoe');
-          }
-          spawnParticles(proj.x, proj.y, proj.color, 12);
-        } else spawnParticles(proj.x, proj.y, proj.color, 5);
-        proj.lifetime=0; hit=true; break;
+// ================================================================
+//  PROJECTILES
+// ================================================================
+function tickProjs(){
+  for(const pr of G.projs){
+    pr.life--;
+    if(pr.visual||pr.life<=0) continue;
+    pr.x+=pr.vx; pr.y+=pr.vy;
+    // Hit check
+    let hit=false;
+    for(const m of G.minions){
+      if(m.team===pr.team||m.lane!==pr.lane) continue;
+      if(Math.abs(m.x-pr.x)<20&&Math.abs(m.y-pr.y)<20){
+        applyDmg(m,pr.dmg);
+        if(pr.aoe>0){
+          G.minions.forEach(m2=>{ if(m2.team!==pr.team&&m2.id!==m.id&&Math.abs(m2.x-pr.x)<pr.aoe) applyDmg(m2,pr.dmg*.6); });
+          particles(pr.x,pr.y,pr.color,10);
+        }
+        pr.life=0; hit=true; break;
       }
     }
     if(hit) continue;
-    // Enemy players
-    for(const op of Object.values(G.players)) {
-      if(op.team===proj.team||op.dead||op.lane!==proj.lane) continue;
-      if(Math.abs(op.x-proj.x)<20 && Math.abs(op.y-proj.y)<24) {
-        applyDamage(op, proj.dmg, 'projectile');
-        spawnParticles(proj.x, proj.y, proj.color, 6);
-        proj.lifetime=0; hit=true; break;
-      }
+    for(const op of Object.values(G.players)){
+      if(op.team===pr.team||op.dead||op.lane!==pr.lane) continue;
+      if(Math.abs(op.x-pr.x)<20&&Math.abs(op.y-pr.y)<24){ applyDmg(op,pr.dmg); particles(pr.x,pr.y,pr.color,5); pr.life=0; break; }
     }
-    if(hit) continue;
-    // Towers
-    for(const t of G.towers) {
-      if(t.team===proj.team||t.lane!==proj.lane||t.hp<=0) continue;
-      if(Math.abs(t.x-proj.x)<C.TOWER_W && Math.abs(t.y||C.LANE_Y[t.lane]-proj.y)<C.TOWER_H/2) {
-        applyDamage(t, proj.dmg, 'projectile');
-        proj.lifetime=0; break;
-      }
+    for(const t of G.towers){
+      if(t.team===pr.team||t.lane!==pr.lane||t.hp<=0) continue;
+      if(Math.abs(t.x-pr.x)<20){ applyDmg(t,pr.dmg); pr.life=0; break; }
     }
-    // Nexus hit
-    if(!hit) {
-      const nx = proj.team==='left' ? C.BASE_X_R+30 : C.BASE_X_L+30;
-      const nexusTeam = proj.team==='left'?'right':'left';
-      if(Math.abs(proj.x-nx)<60) {
-        G.nexus[nexusTeam].hp = Math.max(0, G.nexus[nexusTeam].hp - proj.dmg);
-        spawnParticles(proj.x, proj.y, proj.color, 8);
-        proj.lifetime=0;
-      }
-    }
-    // Out of bounds
-    if(proj.x < 0 || proj.x > C.W) proj.lifetime=0;
+    if(pr.x<0||pr.x>W) pr.life=0;
   }
-  G.projectiles = G.projectiles.filter(p=>p.lifetime>0);
+  G.projs=G.projs.filter(p=>p.life>0);
 }
 
-function applyDamage(target, amount, source) {
-  if(!target || target.hp === undefined) return;
-  // Evasion check
-  if(target.evasion && Math.random() < target.evasion) {
-    floatText(target, 'DODGE', '#fff');
-    return;
-  }
-  target.hp = Math.max(0, target.hp - amount);
-  floatText(target, '-'+amount, source==='player'||source==='ability'?'#f66':'#fa8');
-  if(target.hp <= 0 && target.charKey) target.dead = true;
+// ================================================================
+//  WIN CHECK
+// ================================================================
+function checkNexus(){
+  G.nexus.L.hp=Math.max(0,G.nexus.L.hp);
+  G.nexus.R.hp=Math.max(0,G.nexus.R.hp);
 }
 
-function checkNexus() {
-  for(const side of ['left','right']) {
-    if(G.nexus[side].hp < 0) G.nexus[side].hp = 0;
-  }
+function checkWin(){
+  if(G.phase!=='playing') return;
+  if(G.nexus.R.hp<=0){ G.phase='win_L'; showWin('win_L'); }
+  if(G.nexus.L.hp<=0){ G.phase='win_R'; showWin('win_R'); }
 }
 
-function checkWinCondition() {
-  if(G.phase !== 'playing') return;
-  if(G.nexus.right.hp <= 0) { G.phase = 'win_left'; handleWin('win_left'); }
-  if(G.nexus.left.hp  <= 0) { G.phase = 'win_right'; handleWin('win_right'); }
-  // If a player dies, respawn after 5s
-  for(const p of Object.values(G.players)) {
-    if(p.dead) {
-      if(!p.respawnTimer) p.respawnTimer = 300;
-      p.respawnTimer--;
-      if(p.respawnTimer <= 0) {
-        p.hp = p.maxHp;
-        p.dead = false;
-        p.respawnTimer = 0;
-        p.x = p.team==='left'?110:C.W-110;
-        p.lane = 0; p.y = C.LANE_Y[0];
-        floatText(p, 'RESPAWN', '#2ecc71');
-      }
-    }
-  }
-}
-
-function handleWin(phase) {
-  if(document.getElementById('win-overlay').classList.contains('active')) return;
-  const myTeam = G.players[myId]?.team;
-  let msg='';
-  if(phase==='win_left') msg = myTeam==='left'?'🏆 VICTORY!':'💀 DEFEAT';
-  if(phase==='win_right') msg = myTeam==='right'?'🏆 VICTORY!':'💀 DEFEAT';
-  const winEl = document.getElementById('win-msg');
-  winEl.textContent = msg;
-  winEl.style.color = msg.includes('VICTORY')?'#f0b840':'#e74c3c';
-  document.getElementById('win-overlay').classList.add('active');
+function showWin(phase){
+  if(document.getElementById('win').classList.contains('show')) return;
+  const myTeam=G.players[myPid()]?.team;
+  const won=(phase==='win_L'&&myTeam==='L')||(phase==='win_R'&&myTeam==='R');
+  const msg=document.getElementById('win-msg');
+  msg.textContent=won?'🏆 VICTORY!':'💀 DEFEAT';
+  msg.style.color=won?'#f0b840':'#e74c3c';
+  document.getElementById('win').classList.add('show');
   cancelAnimationFrame(animId);
 }
 
 // ================================================================
 //  PARTICLES & FLOATS
 // ================================================================
-function spawnParticles(x, y, color, count) {
-  for(let i=0;i<count;i++) {
-    G.particles.push({
-      x, y, vx:(Math.random()-0.5)*4, vy:(Math.random()-0.5)*4-1,
-      life:30+Math.random()*20, maxLife:50, color
-    });
+function particles(x,y,col,n){
+  for(let i=0;i<n;i++){
+    G.particles.push({x,y,vx:(Math.random()-.5)*4,vy:(Math.random()-.5)*4-1,
+      life:30+Math.random()*20,max:50,col});
   }
 }
 
-function floatText(entity, text, color) {
-  G.floats.push({
-    x: entity.x||0, y: (entity.y||200)-10,
-    text, color, life:60, vy:-0.8
-  });
+function float(e,text,col){
+  G.floats.push({x:e.x||0,y:(e.y||200)-12,text,col,life:60,vy:-.8});
 }
 
-function flashEffect(entity, color, frames) {
-  entity._flash = frames; entity._flashColor = color;
-}
-
-function shakeScreen() { G.shake = 8; }
-
-function updateParticles() {
-  for(const p of G.particles) { p.x+=p.vx; p.y+=p.vy; p.vy+=0.08; p.life--; }
-  for(const f of G.floats) { f.y+=f.vy; f.life--; }
-  G.particles = G.particles.filter(p=>p.life>0);
-  G.floats = G.floats.filter(f=>f.life>0);
+function tickParticles(){
+  for(const p of G.particles){ p.x+=p.vx; p.y+=p.vy; p.vy+=.08; p.life--; }
+  for(const f of G.floats){ f.y+=f.vy; f.life--; }
+  G.particles=G.particles.filter(p=>p.life>0);
+  G.floats=G.floats.filter(f=>f.life>0);
   if(G.shake>0) G.shake--;
-  for(const p of Object.values(G.players)) { if(p._flash>0) p._flash--; }
 }
 
 // ================================================================
-//  RENDERING
+//  RENDER
 // ================================================================
-function render() {
-  if(G.shake>0) {
-    const s=G.shake;
-    ctx.setTransform(1,0,0,1,(Math.random()-0.5)*s,(Math.random()-0.5)*s);
-  } else ctx.setTransform(1,0,0,1,0,0);
+function render(){
+  ctx.save();
+  if(G.shake>0) ctx.translate((Math.random()-.5)*G.shake,(Math.random()-.5)*G.shake);
 
-  ctx.clearRect(0,0,C.W,C.H);
+  // BG
+  ctx.fillStyle='#04040d'; ctx.fillRect(0,0,W,H);
 
-  // Background
-  ctx.fillStyle='#04040d'; ctx.fillRect(0,0,C.W,C.H);
-
-  // Lane bands
-  for(let lane=0;lane<2;lane++) {
-    const ly = C.LANE_Y[lane];
-    ctx.fillStyle='#0a0a1a';
-    ctx.fillRect(C.BASE_X_L+C.BASE_W, ly-C.LANE_H/2, C.W-C.BASE_W*2, C.LANE_H);
-    // Lane border
-    ctx.strokeStyle='#1a1a3a'; ctx.lineWidth=1;
-    ctx.strokeRect(C.BASE_X_L+C.BASE_W, ly-C.LANE_H/2, C.W-C.BASE_W*2, C.LANE_H);
+  // Lanes
+  for(let lane=0;lane<2;lane++){
+    const ly=LANE_Y[lane];
+    ctx.fillStyle='#080818'; ctx.fillRect(BASE_W,ly-LANE_H/2,W-BASE_W*2,LANE_H);
+    ctx.strokeStyle='#131328'; ctx.lineWidth=1;
+    ctx.strokeRect(BASE_W,ly-LANE_H/2,W-BASE_W*2,LANE_H);
+    // Lane road markings
+    ctx.strokeStyle='#1a1a38'; ctx.setLineDash([20,30]); ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(BASE_W,ly); ctx.lineTo(W-BASE_W,ly); ctx.stroke();
+    ctx.setLineDash([]);
   }
 
-  // Bases (nexus)
-  drawNexus('left');
-  drawNexus('right');
-
-  // Towers
-  for(const t of G.towers) { if(t.hp>0) drawTower(t); }
-
-  // Minions
-  for(const m of G.minions) { drawMinion(m); }
-
-  // Players
-  for(const p of Object.values(G.players)) { if(!p.dead) drawPlayer(p); }
-
-  // Projectiles
-  for(const proj of G.projectiles) { drawProjectile(proj); }
+  drawNexus('L'); drawNexus('R');
+  G.towers.forEach(t=>{ if(t.hp>0) drawTower(t); });
+  G.minions.forEach(drawMinion);
+  Object.values(G.players).forEach(p=>{ if(!p.dead) drawPlayer(p); });
+  G.projs.forEach(drawProj);
 
   // Particles
-  for(const p of G.particles) {
-    ctx.globalAlpha = p.life/p.maxLife;
-    ctx.fillStyle = p.color;
-    ctx.fillRect(p.x-2, p.y-2, 4, 4);
+  for(const p of G.particles){
+    ctx.globalAlpha=p.life/p.max;
+    ctx.fillStyle=p.col;
+    ctx.fillRect(p.x-2,p.y-2,4,4);
   }
   ctx.globalAlpha=1;
 
-  // Float texts
-  for(const f of G.floats) {
-    ctx.globalAlpha = Math.min(1, f.life/30);
-    ctx.fillStyle = f.color;
-    ctx.font = 'bold 13px Share Tech Mono, monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(f.text, f.x, f.y);
-  }
-  ctx.globalAlpha=1;
-
-  // Tower range (hover debug: off)
-}
-
-function drawNexus(side) {
-  const n = G.nexus[side];
-  const x = side==='left' ? C.BASE_X_L : C.BASE_X_R;
-  const isLeft = side==='left';
-  const teamColor = isLeft ? '#1a3a8a' : '#8a1a1a';
-  const borderColor = isLeft ? '#4a7fff' : '#ff4a4a';
-
-  ctx.fillStyle = teamColor;
-  ctx.fillRect(x, 0, C.BASE_W, C.H);
-  ctx.strokeStyle = borderColor;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x, 0, C.BASE_W, C.H);
-
-  // Label
-  ctx.fillStyle = borderColor;
-  ctx.font = '9px Share Tech Mono, monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('NEXUS', x+C.BASE_W/2, 20);
-  // HP bar
-  const barW = C.BASE_W-8, barH=8;
-  ctx.fillStyle='#0a0a1a';
-  ctx.fillRect(x+4, 26, barW, barH);
-  const pct = n.hp / n.maxHp;
-  ctx.fillStyle = pct>0.5?'#2ecc71':pct>0.25?'#f0b840':'#e74c3c';
-  ctx.fillRect(x+4, 26, barW*pct, barH);
-  ctx.fillStyle = borderColor;
+  // Floats
   ctx.textAlign='center';
-  ctx.fillText(Math.ceil(n.hp)+'/'+n.maxHp, x+C.BASE_W/2, 48);
-}
-
-function drawTower(t) {
-  const x = t.x;
-  const y = C.LANE_Y[t.lane];
-  const teamColor = t.team==='left'?'#2a4a9a':'#9a2a2a';
-  const borderColor = t.team==='left'?'#4a7fff':'#ff4a4a';
-
-  ctx.fillStyle = teamColor;
-  ctx.fillRect(x-C.TOWER_W/2, y-C.TOWER_H+8, C.TOWER_W, C.TOWER_H);
-  ctx.strokeStyle = borderColor; ctx.lineWidth=2;
-  ctx.strokeRect(x-C.TOWER_W/2, y-C.TOWER_H+8, C.TOWER_W, C.TOWER_H);
-
-  // Tower battlement
-  ctx.fillStyle=borderColor;
-  for(let i=0;i<3;i++){
-    ctx.fillRect(x-C.TOWER_W/2+i*(C.TOWER_W/3+1), y-C.TOWER_H+3, C.TOWER_W/3-1, 8);
+  for(const f of G.floats){
+    ctx.globalAlpha=Math.min(1,f.life/30);
+    ctx.fillStyle=f.col;
+    ctx.font='bold 13px Share Tech Mono,monospace';
+    ctx.fillText(f.text,f.x,f.y);
   }
-
-  // HP bar
-  const barW=C.TOWER_W+4;
-  ctx.fillStyle='#0a0a1a';
-  ctx.fillRect(x-barW/2, y-C.TOWER_H+2, barW, 4);
-  ctx.fillStyle = t.hp>10?'#2ecc71':'#e74c3c';
-  ctx.fillRect(x-barW/2, y-C.TOWER_H+2, barW*(t.hp/t.maxHp), 4);
+  ctx.globalAlpha=1;
+  ctx.restore();
 }
 
-function drawMinion(m) {
+function drawNexus(side){
+  const n=G.nexus[side];
+  const x=side==='L'?0:W-BASE_W;
+  const tc=side==='L'?'#112255':'#552211';
+  const bc=side==='L'?'#3a6fff':'#ff3a3a';
+  ctx.fillStyle=tc; ctx.fillRect(x,0,BASE_W,H);
+  ctx.strokeStyle=bc; ctx.lineWidth=2; ctx.strokeRect(x,0,BASE_W,H);
+  ctx.fillStyle=bc; ctx.font='7px Press Start 2P,monospace'; ctx.textAlign='center';
+  ctx.fillText('NEXUS',x+BASE_W/2,18);
+  const bw=BASE_W-10, bh=7;
+  ctx.fillStyle='#0a0a1a'; ctx.fillRect(x+5,24,bw,bh);
+  const pct=n.hp/n.max;
+  ctx.fillStyle=pct>.5?'#2ecc71':pct>.25?'#f0b840':'#e74c3c';
+  ctx.fillRect(x+5,24,bw*pct,bh);
+  ctx.fillStyle=bc; ctx.font='7px Share Tech Mono,monospace';
+  ctx.fillText(Math.ceil(n.hp)+'/'+n.max,x+BASE_W/2,44);
+}
+
+function drawTower(t){
+  const x=t.x, y=LANE_Y[t.lane];
+  const tc=t.team==='L'?'#1a3a7a':'#7a1a1a';
+  const bc=t.team==='L'?'#3a7fff':'#ff3a3a';
+  const tw=32, th=60;
+  ctx.fillStyle=tc; ctx.fillRect(x-tw/2,y-th+6,tw,th);
+  ctx.strokeStyle=bc; ctx.lineWidth=2; ctx.strokeRect(x-tw/2,y-th+6,tw,th);
+  // Battlements
+  for(let i=0;i<3;i++){
+    ctx.fillStyle=bc;
+    ctx.fillRect(x-tw/2+i*(tw/3+.5),y-th+1,tw/3-1,7);
+  }
+  // HP bar
+  const bw=tw+6;
+  ctx.fillStyle='#0a0a1a'; ctx.fillRect(x-bw/2,y-th,bw,4);
+  ctx.fillStyle=t.hp>10?'#2ecc71':'#e74c3c';
+  ctx.fillRect(x-bw/2,y-th,bw*(t.hp/t.maxHp),4);
+}
+
+function drawMinion(m){
   if(m.hp<=0) return;
-  const x = m.x; const y = m.y;
-  const teamColor = m.team==='left'?'#2060e0':'#e02020';
-  const borderColor = m.team==='left'?'#6090ff':'#ff6060';
-  const isSummoned = m.summoned;
-
-  ctx.fillStyle = m.slow>0?'#88ccff':teamColor;
-  ctx.fillRect(x-C.MINION_W/2, y-C.MINION_H+2, C.MINION_W, C.MINION_H);
-  ctx.strokeStyle = isSummoned?'#8e44ad':borderColor; ctx.lineWidth=1.5;
-  ctx.strokeRect(x-C.MINION_W/2, y-C.MINION_H+2, C.MINION_W, C.MINION_H);
-
-  // HP bar
-  const bw=C.MINION_W+4;
-  ctx.fillStyle='#0a0a1a'; ctx.fillRect(x-bw/2, y-C.MINION_H-2, bw, 3);
-  ctx.fillStyle=teamColor; ctx.fillRect(x-bw/2, y-C.MINION_H-2, bw*(m.hp/m.maxHp), 3);
+  const x=m.x, y=m.y;
+  const tc=m.team==='L'?'#1a50c8':'#c81a1a';
+  const bc=m.team==='L'?'#4a80ff':'#ff4a4a';
+  const w=18,h=22;
+  ctx.fillStyle=m.summon?'#6a2a9a':tc;
+  ctx.fillRect(x-w/2,y-h+2,w,h);
+  ctx.strokeStyle=m.summon?'#8e44ad':bc; ctx.lineWidth=1.5;
+  ctx.strokeRect(x-w/2,y-h+2,w,h);
+  const bw=w+4;
+  ctx.fillStyle='#0a0a1a'; ctx.fillRect(x-bw/2,y-h-2,bw,3);
+  ctx.fillStyle=tc; ctx.fillRect(x-bw/2,y-h-2,bw*(m.hp/m.maxHp),3);
 }
 
-function drawPlayer(p) {
-  const ch = CHARACTERS[p.charKey];
+function drawPlayer(p){
+  const ch=CHARS[p.charKey];
   const x=p.x, y=p.y;
-  const w=C.PLAYER_W, h=C.PLAYER_H;
-  const isMe = p.id===myId;
-  const teamBorder = p.team==='left'?'#4a7fff':'#ff4a4a';
-  const flash = p._flash>0;
+  const w=24, h=34;
+  const isMe=p.id===myPid();
+  const bc=p.team==='L'?'#4a80ff':'#ff4a4a';
 
   ctx.save();
-  // Invisible players are faded
-  if(p.invisible>0 && p.team!==G.players[myId]?.team) {
-    ctx.globalAlpha=0.15;
-  } else if(p.invisible>0) {
-    ctx.globalAlpha=0.4;
+  // Invisible dimming
+  if(p.invis>0){
+    ctx.globalAlpha = (p.team===G.players[myPid()]?.team) ? .35 : .1;
   }
 
-  // Flash effect
-  const bodyColor = flash ? p._flashColor : ch.color;
+  // Shape
+  const col=p.flash>0?p.flashCol:ch.color;
+  ctx.fillStyle=col+'cc';
+  ctx.strokeStyle=isMe?'#ffffff':bc; ctx.lineWidth=2;
 
-  // Draw shape based on character
-  ctx.strokeStyle = isMe ? '#fff' : teamBorder; ctx.lineWidth=2;
-  ctx.fillStyle = bodyColor+'cc';
-
-  switch(ch.shape) {
+  switch(ch.shape){
     case 'rect':
-      ctx.fillRect(x-w/2, y-h+4, w, h);
-      ctx.strokeRect(x-w/2, y-h+4, w, h);
-      break;
+      ctx.fillRect(x-w/2,y-h+4,w,h); ctx.strokeRect(x-w/2,y-h+4,w,h); break;
     case 'circle':
-      ctx.beginPath(); ctx.arc(x, y-h/2+4, h/2, 0, Math.PI*2);
-      ctx.fill(); ctx.stroke(); break;
+      ctx.beginPath(); ctx.arc(x,y-h/2+4,h/2,0,Math.PI*2); ctx.fill(); ctx.stroke(); break;
     case 'diamond':
-      ctx.beginPath();
-      ctx.moveTo(x, y-h+4); ctx.lineTo(x+w/2, y-h/2+4);
-      ctx.lineTo(x, y+4); ctx.lineTo(x-w/2, y-h/2+4);
-      ctx.closePath(); ctx.fill(); ctx.stroke(); break;
-    case 'triangle':
-      ctx.beginPath();
-      ctx.moveTo(x, y-h+4);
-      ctx.lineTo(x+w/2+3, y+4);
-      ctx.lineTo(x-w/2-3, y+4);
+      ctx.beginPath(); ctx.moveTo(x,y-h+4); ctx.lineTo(x+w/2,y-h/2+4);
+      ctx.lineTo(x,y+4); ctx.lineTo(x-w/2,y-h/2+4); ctx.closePath(); ctx.fill(); ctx.stroke(); break;
+    case 'tri':
+      ctx.beginPath(); ctx.moveTo(x,y-h+4); ctx.lineTo(x+w/2+3,y+4); ctx.lineTo(x-w/2-3,y+4);
       ctx.closePath(); ctx.fill(); ctx.stroke(); break;
     case 'hex':
       ctx.beginPath();
-      for(let i=0;i<6;i++){
-        const a=(Math.PI/3)*i - Math.PI/6;
-        const r=h/2;
-        if(i===0) ctx.moveTo(x+r*Math.cos(a), y-h/2+4+r*Math.sin(a));
-        else ctx.lineTo(x+r*Math.cos(a), y-h/2+4+r*Math.sin(a));
-      }
+      for(let i=0;i<6;i++){const a=(Math.PI/3)*i-Math.PI/6,r=h/2;
+        i===0?ctx.moveTo(x+r*Math.cos(a),y-h/2+4+r*Math.sin(a)):ctx.lineTo(x+r*Math.cos(a),y-h/2+4+r*Math.sin(a));}
       ctx.closePath(); ctx.fill(); ctx.stroke(); break;
     default:
-      ctx.fillRect(x-w/2, y-h+4, w, h);
-      ctx.strokeRect(x-w/2, y-h+4, w, h);
+      ctx.fillRect(x-w/2,y-h+4,w,h); ctx.strokeRect(x-w/2,y-h+4,w,h);
   }
 
   // Emoji
-  ctx.font='14px serif'; ctx.textAlign='center';
-  ctx.fillText(ch.emoji, x, y-h/2+8);
+  ctx.font='13px serif'; ctx.textAlign='center'; ctx.globalAlpha=Math.max(ctx.globalAlpha,.4);
+  ctx.fillStyle='white'; // reset for text
+  ctx.fillText(ch.emoji,x,y-h/2+8);
 
   // HP bar
-  const bw=w+10;
-  ctx.fillStyle='#0a0a1a'; ctx.fillRect(x-bw/2, y-h, bw, 5);
+  const bw=w+12;
+  ctx.globalAlpha=1;
+  ctx.fillStyle='#0a0a1a'; ctx.fillRect(x-bw/2,y-h,bw,5);
   const pct=p.hp/p.maxHp;
-  ctx.fillStyle=pct>0.5?'#2ecc71':pct>0.25?'#f0b840':'#e74c3c';
-  ctx.fillRect(x-bw/2, y-h, bw*pct, 5);
+  ctx.fillStyle=pct>.5?'#2ecc71':pct>.25?'#f0b840':'#e74c3c';
+  ctx.fillRect(x-bw/2,y-h,bw*pct,5);
 
   // Name
-  ctx.fillStyle= isMe?'#fff':teamBorder;
-  ctx.font='8px Share Tech Mono, monospace'; ctx.textAlign='center';
-  ctx.fillText(p.name||p.charKey, x, y-h-6);
+  ctx.fillStyle=isMe?'#ffffff':bc;
+  ctx.font='8px Share Tech Mono,monospace'; ctx.textAlign='center';
+  ctx.fillText(p.name||p.charKey,x,y-h-7);
 
-  // Status indicators
-  if(p.rageTimer>0) { ctx.fillStyle='#e74c3c'; ctx.font='10px serif'; ctx.fillText('💢',x+16,y-h+12); }
-  if(p.invisible>0) { ctx.fillStyle='#aaa'; ctx.font='10px serif'; ctx.fillText('👁',x-16,y-h+12); }
-  if(p.stunTimer>0) { ctx.fillStyle='#ff0'; ctx.font='10px serif'; ctx.fillText('⭐',x,y-h+12); }
+  // Status icons
+  if(p.rageT>0){ ctx.font='10px serif'; ctx.fillText('💢',x+16,y-h+12); }
+  if(p.invis>0){ ctx.font='10px serif'; ctx.fillText('👁',x-16,y-h+12); }
+  if(p.stunT>0){ ctx.font='10px serif'; ctx.fillText('⭐',x,y-h+12); }
 
   ctx.restore();
 }
 
-function drawProjectile(proj) {
-  if(proj.lifetime<=0) return;
-  ctx.beginPath();
-  ctx.arc(proj.x, proj.y, proj.type==='fireball'?6:3, 0, Math.PI*2);
-  ctx.fillStyle = proj.color;
-  ctx.fill();
-  if(proj.type==='fireball') {
-    ctx.shadowBlur=15; ctx.shadowColor=proj.color;
-    ctx.fill(); ctx.shadowBlur=0;
+function drawProj(pr){
+  if(pr.life<=0) return;
+  if(pr.visual){
+    // Tower bolt: draw line from pr.x/y to pr.tx/ty, fading
+    const alpha=pr.life/pr.maxLife;
+    ctx.save(); ctx.globalAlpha=alpha; ctx.strokeStyle=pr.color; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(pr.x,pr.y); ctx.lineTo(pr.tx,pr.ty); ctx.stroke();
+    ctx.restore();
+    return;
+  }
+  const isFireball=pr.aoe>0;
+  ctx.beginPath(); ctx.arc(pr.x,pr.y,isFireball?6:3,0,Math.PI*2);
+  ctx.fillStyle=pr.color; ctx.fill();
+  if(isFireball){
+    ctx.shadowBlur=16; ctx.shadowColor=pr.color; ctx.fill(); ctx.shadowBlur=0;
   }
 }
 
 // ================================================================
 //  HUD
 // ================================================================
-function setupHUD() {
-  const me = G.players[myId];
+function setupHUDLabels(){
+  const me=G.players[myPid()];
   if(!me) return;
-  document.getElementById('hl-name').textContent = me.name;
-  document.getElementById('hl-name').style.color = me.team==='left'?'#4af':'#f44';
-  const ch = CHARACTERS[me.charKey];
-  document.getElementById('ab1-name').textContent = ch.ability1.name.substr(0,6);
-  document.getElementById('ab2-name').textContent = ch.ability2.name.substr(0,6);
+  const ch=CHARS[me.charKey];
+  document.getElementById('hl-name').textContent=me.name;
+  document.getElementById('hl-name').style.color=me.team==='L'?'#4af':'#f44';
+  document.getElementById('ab1n').textContent=ch.q.name.substr(0,7);
+  document.getElementById('ab2n').textContent=ch.e.name.substr(0,7);
+  const op=G.players[opPid()];
+  if(op){ document.getElementById('hr-name').textContent=op.name; }
 }
 
-function updateHUD() {
-  const me = G.players[myId];
-  const op = Object.values(G.players).find(p=>p.id!==myId);
-
-  if(me) {
-    const pct = me.hp/me.maxHp;
-    document.getElementById('hl-hp').style.width = (pct*100)+'%';
-    document.getElementById('hl-hpnum').textContent = Math.max(0,Math.ceil(me.hp))+'/'+me.maxHp;
+function updateHUD(){
+  const me=G.players[myPid()];
+  const op=G.players[opPid()];
+  if(me){
+    document.getElementById('hl-hp').style.width=(me.hp/me.maxHp*100)+'%';
+    document.getElementById('hl-hpn').textContent=Math.max(0,Math.ceil(me.hp))+'/'+me.maxHp;
   }
-  if(op) {
-    const pct = op.hp/op.maxHp;
-    document.getElementById('hr-hp').style.width = (pct*100)+'%';
-    document.getElementById('hr-hpnum').textContent = Math.max(0,Math.ceil(op.hp))+'/'+op.maxHp;
-    document.getElementById('hr-name').textContent = op.name||opName;
+  if(op){
+    document.getElementById('hr-hp').style.width=(op.hp/op.maxHp*100)+'%';
+    document.getElementById('hr-hpn').textContent=Math.max(0,Math.ceil(op.hp))+'/'+op.maxHp;
   }
-
-  // Ability cooldown overlays
-  const ch = myChar ? CHARACTERS[myChar] : null;
-  updateCoolUI('acool-atk', atkCool, 45);
-  if(ch) {
-    updateCoolUI('acool-ab1', ab1Cool, ch.ability1.cooldown);
-    updateCoolUI('acool-ab2', ab2Cool, ch.ability2.cooldown);
-  }
-
-  // Wave timer
-  const secsToWave = Math.ceil(G.waveTimer/C.FPS);
-  document.getElementById('hud-wave').textContent = `Wave ${G.wave} · Next in ${secsToWave}s`;
+  // Cooldowns
+  setCoolUI('c-atk',cdAtk,me?.atkCd||45);
+  if(me){ setCoolUI('c-ab1',cdQ,CHARS[me.charKey].q.cd); setCoolUI('c-ab2',cdE,CHARS[me.charKey].e.cd); }
+  // Wave
+  const secs=Math.ceil((G.waveT||0)/FPS);
+  document.getElementById('hud-wave').textContent=`Wave ${G.wave} · next in ${secs}s`;
 }
 
-function updateCoolUI(id, cool, maxCool) {
-  const el = document.getElementById(id);
-  if(!el) return;
-  if(cool>0) {
-    el.classList.remove('hidden');
-    el.textContent = Math.ceil(cool/C.FPS);
-  } else {
-    el.classList.add('hidden');
-  }
+function setCoolUI(id,cd,max){
+  const el=document.getElementById(id); if(!el) return;
+  if(cd>0){ el.classList.remove('off'); el.textContent=Math.ceil(cd/FPS); }
+  else el.classList.add('off');
 }
 
 // ================================================================
-//  UTILITY
+//  UTILS
 // ================================================================
-function getMyPlayer() {
-  // Host's player ID is hostPlayerId, guest's is guestId (= myId for guest)
-  return G.players[myId] || null;
+function uid(){ return Math.random().toString(36).substr(2,9); }
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+id).classList.add('active');
 }
 
 // ================================================================
-//  INIT ON LOAD
+//  INIT
 // ================================================================
-window.onload = () => {
-  // Check for saved Firebase config
-  const saved = localStorage.getItem('lm_fbcfg');
-  if(saved) {
-    document.getElementById('cfg-json').value = saved;
-  }
-
-  // Try auto-connect only if config has databaseURL
-  if(saved) {
-    try {
-      const cfg = JSON.parse(saved);
-      if(cfg.databaseURL) {
-        if(firebase.apps.length > 0) firebase.apps[0].delete();
-        firebase.initializeApp(cfg);
-        db = firebase.database();
-        showScreen('lobby');
-      } else {
-        document.getElementById('cfg-err').textContent = '✗ Saved config is missing databaseURL — please re-enter your config below.';
-      }
-    } catch(e) { /* stay on config screen */ }
+window.onload=()=>{
+  const saved=localStorage.getItem('lm_key');
+  if(saved){
+    document.getElementById('cfg-key').value=saved;
+    document.getElementById('cfg-err').textContent='Reconnecting…';
+    try{
+      ably=new Ably.Realtime({key:saved,closeOnUnload:true});
+      ably.connection.once('connected',()=>{ document.getElementById('cfg-err').textContent=''; showScreen('lobby'); });
+      ably.connection.once('failed',()=>{ document.getElementById('cfg-err').textContent='✗ Saved key failed — re-enter below.'; });
+    }catch(e){ document.getElementById('cfg-err').textContent='✗ '+e.message; }
   }
 };
 </script>
