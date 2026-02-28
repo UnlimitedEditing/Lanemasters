@@ -255,6 +255,62 @@ const WAVE_INT=1800, WAVE_SIZE=3;
 const FPS=60;
 
 // ================================================================
+//  SOUND SYSTEM (Web Audio API — no library needed)
+// ================================================================
+let audioCtx=null;
+function getAudio(){
+  if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  return audioCtx;
+}
+function playSound(type){
+  try{
+    const ac=getAudio();
+    const o=ac.createOscillator(), g=ac.createGain();
+    o.connect(g); g.connect(ac.destination);
+    const now=ac.currentTime;
+    switch(type){
+      case 'atk':
+        o.type='square'; o.frequency.setValueAtTime(280,now);
+        o.frequency.exponentialRampToValueAtTime(120,now+.08);
+        g.gain.setValueAtTime(.18,now); g.gain.exponentialRampToValueAtTime(.001,now+.1);
+        o.start(now); o.stop(now+.1); break;
+      case 'hit':
+        o.type='sawtooth'; o.frequency.setValueAtTime(180,now);
+        o.frequency.exponentialRampToValueAtTime(60,now+.12);
+        g.gain.setValueAtTime(.25,now); g.gain.exponentialRampToValueAtTime(.001,now+.14);
+        o.start(now); o.stop(now+.14); break;
+      case 'ability':
+        o.type='sine'; o.frequency.setValueAtTime(440,now);
+        o.frequency.exponentialRampToValueAtTime(880,now+.1);
+        o.frequency.exponentialRampToValueAtTime(220,now+.22);
+        g.gain.setValueAtTime(.2,now); g.gain.exponentialRampToValueAtTime(.001,now+.25);
+        o.start(now); o.stop(now+.25); break;
+      case 'death':
+        o.type='sawtooth'; o.frequency.setValueAtTime(120,now);
+        o.frequency.exponentialRampToValueAtTime(30,now+.4);
+        g.gain.setValueAtTime(.3,now); g.gain.exponentialRampToValueAtTime(.001,now+.45);
+        o.start(now); o.stop(now+.45); break;
+      case 'wave':
+        o.type='square'; o.frequency.setValueAtTime(330,now);
+        o.frequency.setValueAtTime(440,now+.08);
+        o.frequency.setValueAtTime(550,now+.16);
+        g.gain.setValueAtTime(.15,now); g.gain.exponentialRampToValueAtTime(.001,now+.3);
+        o.start(now); o.stop(now+.3); break;
+      case 'tower':
+        o.type='sawtooth'; o.frequency.setValueAtTime(600,now);
+        o.frequency.exponentialRampToValueAtTime(200,now+.07);
+        g.gain.setValueAtTime(.12,now); g.gain.exponentialRampToValueAtTime(.001,now+.09);
+        o.start(now); o.stop(now+.09); break;
+      case 'select':
+        o.type='sine'; o.frequency.setValueAtTime(520,now);
+        o.frequency.setValueAtTime(660,now+.07);
+        g.gain.setValueAtTime(.12,now); g.gain.exponentialRampToValueAtTime(.001,now+.18);
+        o.start(now); o.stop(now+.18); break;
+    }
+  }catch(e){}
+}
+
+// ================================================================
 //  ABLY STATE
 // ================================================================
 let ably=null, channel=null;
@@ -409,6 +465,7 @@ function setCsStatus(m){document.getElementById('cs-status').textContent=m;}
 
 function lockChar(){
   if(!selectedChar) return;
+  playSound('select');
   myChar=selectedChar;
   document.getElementById('lock-btn').disabled=true;
   setCsStatus('Locked in '+CHARS[myChar].name+'! Waiting for '+(opName||'opponent')+'…');
@@ -567,15 +624,14 @@ function broadcastInput(){
 }
 
 function sendAction(type){
-  if(isHost){
-    // Host executes locally
-    const p=G.players.host;
-    if(type==='atk') doAtk(p,G);
-    else if(type==='q') CHARS[p.charKey].q.fn(p,G);
-    else if(type==='e') CHARS[p.charKey].e.fn(p,G);
-  } else {
-    channel.publish('input',{type});
-  }
+  const p=G.players[myPid()];
+  if(!p) return;
+  // Execute locally immediately (client-side prediction for both host and guest)
+  if(type==='atk'){ doAtk(p,G); playSound('atk'); }
+  else if(type==='q'){ CHARS[p.charKey].q.fn(p,G); playSound('ability'); }
+  else if(type==='e'){ CHARS[p.charKey].e.fn(p,G); playSound('ability'); }
+  // Guest also sends to host for authoritative processing
+  if(!isHost) channel.publish('input',{type});
 }
 
 function applyState(data){
@@ -709,7 +765,7 @@ function hostTick(){
 
   // Wave
   G.waveT--;
-  if(G.waveT<=0){ G.waveT=WAVE_INT; G.wave++; spawnWave(); }
+  if(G.waveT<=0){ G.waveT=WAVE_INT; G.wave++; spawnWave(); playSound('wave'); }
 
   tickMinions();
   tickTowers();
@@ -806,6 +862,7 @@ function tickTowers(){
       t.cd=TOWER_CD;
       const dmg=target.charKey?TOWER_DMG_P:TOWER_DMG_M;
       applyDmg(target,dmg);
+      playSound('tower');
       particles(target.x,target.y,t.team==='L'?'#4af':'#f44',5);
       // Visual bolt
       G.projs.push({x:t.x,y:LANE_Y[t.lane],tx:target.x,ty:target.y,
@@ -898,7 +955,8 @@ function applyDmg(target,dmg){
   if(target.evade&&Math.random()<target.evade){ float(target,'DODGE','#fff'); return; }
   target.hp=Math.max(0,target.hp-dmg);
   float(target,'-'+Math.ceil(dmg),'#f88');
-  if(target.hp<=0&&target.charKey){ target.dead=true; target.respawnT=300; }
+  playSound('hit');
+  if(target.hp<=0&&target.charKey){ target.dead=true; target.respawnT=300; playSound('death'); }
 }
 
 // ================================================================
