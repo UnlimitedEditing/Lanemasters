@@ -422,15 +422,11 @@ function submitConfig() {
   const err = document.getElementById('cfg-err');
   try {
     const cfg = JSON.parse(raw);
-    if (!cfg.databaseURL) throw new Error('Missing databaseURL');
-    firebase.initializeApp(cfg);
-    db = firebase.database();
-    localStorage.setItem('lm_fbcfg', raw);
-    err.textContent = '';
-    showScreen('lobby');
-  } catch(e) {
-    err.textContent = '✗ ' + e.message;
-  }
+    if (!cfg.databaseURL) throw new Error('Missing "databaseURL" — add:\n"databaseURL": "https://YOUR-PROJECT-default-rtdb.firebaseio.com"');
+    const initDb = () => { db = firebase.database(); localStorage.setItem('lm_fbcfg', raw); err.textContent = ''; showScreen('lobby'); };
+    if (firebase.apps.length > 0) { firebase.apps[0].delete().then(() => { firebase.initializeApp(cfg); initDb(); }); }
+    else { firebase.initializeApp(cfg); initDb(); }
+  } catch(e) { err.textContent = '✗ ' + e.message; }
 }
 
 // ================================================================
@@ -1642,16 +1638,19 @@ window.onload = () => {
     document.getElementById('cfg-json').value = saved;
   }
 
-  // Try auto-connect
+  // Try auto-connect only if config has databaseURL
   if(saved) {
     try {
       const cfg = JSON.parse(saved);
-      firebase.initializeApp(cfg);
-      db = firebase.database();
-      showScreen('lobby');
-    } catch(e) {
-      // stay on config screen
-    }
+      if(cfg.databaseURL) {
+        if(firebase.apps.length > 0) firebase.apps[0].delete();
+        firebase.initializeApp(cfg);
+        db = firebase.database();
+        showScreen('lobby');
+      } else {
+        document.getElementById('cfg-err').textContent = '✗ Saved config is missing databaseURL — please re-enter your config below.';
+      }
+    } catch(e) { /* stay on config screen */ }
   }
 };
 </script>
