@@ -383,6 +383,7 @@ const C = {
 let db, roomRef, isHost=false, myId='', guestId='', roomId='';
 let myChar='', opponentChar='', myName='', opName='';
 let selectedChar='';
+let hostPlayerId=''; // the host's player ID (needed by guest to init game correctly)
 
 // LOCAL game state (host runs simulation; guest predicts self)
 let G = {
@@ -451,6 +452,7 @@ function createRoom() {
   const name = document.getElementById('player-name').value.trim().toUpperCase() || 'PLAYER1';
   myName = name;
   myId = Math.random().toString(36).substr(2,9);
+  hostPlayerId = myId; // host tracks their own id
   roomId = Math.random().toString(36).substr(2,6).toUpperCase();
   isHost = true;
 
@@ -492,7 +494,8 @@ function joinRoom() {
     const data = snap.val();
     if (!data) { setStatus('lobby','Room not found!'); return; }
     if (data.guest) { setStatus('lobby','Room is full!'); return; }
-    guestId = myId;
+    hostPlayerId = data.host; // ← store the host's player ID
+    guestId = myId;           // guest's own ID
     opName = data.hostName || 'HOST';
 
     roomRef.update({ guest: myId, guestName: name });
@@ -608,8 +611,10 @@ function scaleCanvas() {
 }
 
 function initGame() {
-  const leftId  = isHost ? myId : guestId;
-  const rightId = isHost ? guestId : myId;
+  // Host is always left team, guest is always right team.
+  // Both sides need consistent IDs — hostPlayerId is shared via Firebase.
+  const leftId   = hostPlayerId;
+  const rightId  = guestId;
   const leftChar  = isHost ? myChar : opponentChar;
   const rightChar = isHost ? opponentChar : myChar;
   const leftName  = isHost ? myName : opName;
@@ -688,8 +693,8 @@ function applyHostState(data) {
     G.wave = data.wave || 0;
     G.waveTimer = data.waveTimer || 0;
     G.phase = data.phase || 'playing';
-    // Update opponent player from host
-    const hostId = isHost ? myId : Object.keys(data.players||{}).find(id=>id!==myId);
+    // Update opponent (host) player from Firebase state
+    const hostId = hostPlayerId;
     if(hostId && data.players && data.players[hostId]) {
       if(!G.players[hostId]) G.players[hostId] = data.players[hostId];
       else Object.assign(G.players[hostId], data.players[hostId]);
@@ -1622,7 +1627,10 @@ function updateCoolUI(id, cool, maxCool) {
 // ================================================================
 //  UTILITY
 // ================================================================
-function getMyPlayer() { return G.players[myId]; }
+function getMyPlayer() {
+  // Host's player ID is hostPlayerId, guest's is guestId (= myId for guest)
+  return G.players[myId] || null;
+}
 
 // ================================================================
 //  INIT ON LOAD
