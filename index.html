@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LaneMasters ⚔️</title>
+<title>LaneMasters ⚔️ v0.2</title>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
 <style>
@@ -72,6 +72,13 @@ button:disabled{opacity:.4;cursor:default}
 #hud-wave{font-size:.55rem;color:#6a6a8a}
 #ping-dot{width:7px;height:7px;border-radius:50%;background:#2ecc71;display:inline-block;margin-left:4px}
 
+/* Level and Essence HUD */
+#hud-level{display:flex;flex-direction:column;align-items:center;gap:2px}
+#level-badge{background:#1a1000;border:1px solid #f0b840;color:#f0b840;padding:2px 8px;border-radius:3px;font-size:.7rem}
+#essence-bar{width:80px;height:6px;background:#0d0d20;border:1px solid #3a3a5e;border-radius:2px;overflow:hidden}
+#essence-fill{height:100%;background:linear-gradient(90deg,#9b5de5,#f0b840);transition:width .2s}
+#death-timer{color:#e74c3c;font-size:.55rem}
+
 /* canvas */
 #game-wrap{position:relative;margin-top:50px}
 #gc{display:block}
@@ -87,7 +94,7 @@ button:disabled{opacity:.4;cursor:default}
 
 <!-- CONFIG -->
 <div id="screen-config" class="screen active">
-  <h1>LANEMASTERS</h1>
+  <h1>LANEMASTERS v0.2</h1>
   <div class="box" style="max-width:420px">
     <h2>ABLY API KEY</h2>
     <div class="note">
@@ -104,7 +111,7 @@ button:disabled{opacity:.4;cursor:default}
 
 <!-- LOBBY -->
 <div id="screen-lobby" class="screen">
-  <h1>LANEMASTERS</h1>
+  <h1>LANEMASTERS v0.2</h1>
   <div class="box">
     <input id="pname" type="text" placeholder="YOUR NAME" maxlength="14"
       style="text-align:center;text-transform:uppercase;width:240px">
@@ -140,6 +147,11 @@ button:disabled{opacity:.4;cursor:default}
       <span id="hl-name" style="color:#4af">YOU</span>
       <div class="hpwrap"><div class="hpbar" id="hl-hp" style="background:#2ecc71;width:100%"></div></div>
       <span id="hl-hpn">—</span>
+      <div id="hud-level">
+        <div id="level-badge">LVL <span id="level-num">1</span></div>
+        <div id="essence-bar"><div id="essence-fill" style="width:0%"></div></div>
+        <div id="death-timer" style="opacity:0">Death: +<span id="death-num">3</span>s</div>
+      </div>
       <div class="arow">
         <div class="aslot">ATK<span class="ak">J</span><div class="coolover off" id="c-atk"></div></div>
         <div class="aslot"><span id="ab1n">Q</span><span class="ak">Q</span><div class="coolover off" id="c-ab1"></div></div>
@@ -169,8 +181,101 @@ button:disabled{opacity:.4;cursor:default}
 'use strict';
 
 // ================================================================
-//  CHARACTER REGISTRY
-//  To add a character: add one entry here. Nothing else changes.
+//  GAME CONFIGURATION - EDIT THIS TO MODIFY THE GAME
+// ================================================================
+const GAME_CONFIG = {
+  // Map settings
+  map: {
+    width: 1800,           // Total map width (increased from 1200)
+    height: 600,           // Total map height (increased from 440)
+    baseWidth: 80,         // Width of each base
+    nexusHp: 150,          // Nexus health
+  },
+  
+  // Lane configuration (3 lanes: top, mid, bottom)
+  lanes: {
+    count: 3,
+    height: 70,            // Height of each lane path
+    yPositions: [100, 300, 500],  // Y positions for top, mid, bottom lanes
+    // Tower positions for each lane [inner, outer]
+    towerX: {
+      L: [[280, 580], [320, 640], [280, 580]],  // Left team towers per lane
+      R: [[1520, 1220], [1480, 1160], [1520, 1220]]  // Right team towers per lane
+    }
+  },
+  
+  // Jungle configuration (areas between lanes)
+  jungle: {
+    enabled: true,
+    campPositions: [       // Neutral camp positions [x, y]
+      [450, 200], [750, 200], [1050, 200],   // Top jungle
+      [600, 400], [900, 400], [1200, 400]    // Bottom jungle
+    ],
+    spawnInterval: 1200,   // Frames between camp respawns (20 seconds)
+    campHp: 50,            // Jungle camp health
+    campDamage: 8,         // Damage jungle camps deal
+    campEssence: 15,       // Essence dropped by camps
+  },
+  
+  // Side objectives (shrines in side lanes)
+  objectives: {
+    shrines: [
+      { x: 200, lane: 0, type: 'speed', buffDuration: 600 },      // Top lane speed shrine
+      { x: 1600, lane: 0, type: 'speed', buffDuration: 600 },
+      { x: 240, lane: 2, type: 'power', buffDuration: 600 },      // Bottom lane power shrine
+      { x: 1560, lane: 2, type: 'power', buffDuration: 600 }
+    ],
+    respawnTime: 1800      // Frames until shrine respawns (30 seconds)
+  },
+  
+  // Minion settings
+  minions: {
+    hp: 35,
+    speed: 1.0,            // Increased from 0.8
+    range: 45,
+    attackCooldown: 60,    // Reduced from 80
+    damage: 4,             // Increased from 3
+    waveInterval: 900,     // Reduced from 1800 (15 seconds instead of 30)
+    waveSize: 4,           // Increased from 3
+    minionsPerWave: 3,     // Minions per lane per team
+    essenceDrop: 5,        // Essence dropped per minion
+    essenceDropChance: 0.7 // 70% chance to drop essence
+  },
+  
+  // Tower settings
+  towers: {
+    hp: 30,
+    range: 180,
+    cooldown: 60,          // Reduced from 70
+    damageMinion: 18,      // Increased from 15
+    damagePlayer: 25       // Increased from 20
+  },
+  
+  // Leveling system
+  leveling: {
+    maxLevel: 10,
+    essencePerLevel: [0, 30, 70, 120, 180, 250, 330, 420, 520, 630],  // Cumulative essence needed
+    hpBonusPerLevel: 10,   // Bonus HP per level
+    atkBonusPerLevel: 2,   // Bonus attack per level
+    speedBonusPerLevel: 0.1, // Bonus speed per level
+    baseDeathTimer: 180,   // Base frames (3 seconds)
+    deathTimerPerLevel: 60 // Additional frames per level (1 second)
+  },
+  
+  // Player settings
+  player: {
+    respawnInvulnerability: 120  // Frames of invulnerability after respawn
+  },
+  
+  // Visual settings
+  visuals: {
+    shakeIntensity: 8,
+    particleCount: 8
+  }
+};
+
+// ================================================================
+//  CHARACTER REGISTRY - ADD NEW CHARACTERS HERE
 // ================================================================
 const CHARS = {
   warrior:{
@@ -229,33 +334,36 @@ const CHARS = {
     q:{name:'Blink Strike',desc:'Teleport+40dmg',cd:200,fn:(p,G)=>blinkStrike(p,G,150,40)},
     e:{name:'Execute',desc:'30dmg (2x if low)',cd:360,fn:(p,G)=>meleeAbility(p,G,30,60)}
   }
-  // ─── ADD NEW CHARACTERS HERE ───────────────────────────────
-  // key: {
-  //   name:'Name', emoji:'🔥', color:'#hex', shape:'rect|circle|diamond|tri|hex',
-  //   desc:'Short description.',
-  //   stats:{ maxHp:100, speed:2.5, atk:10, range:80, cd:45 },
-  //   q:{ name:'Ability', desc:'Desc', cd:240, fn(p,G){} },
-  //   e:{ name:'Ability', desc:'Desc', cd:360, fn(p,G){} }
-  // }
-  // ───────────────────────────────────────────────────────────
 };
 
 // ================================================================
-//  CONSTANTS
+//  DERIVED CONSTANTS FROM CONFIG
 // ================================================================
-const W=1200, H=440;
-const LANE_Y=[120,320], LANE_H=80;
-const BASE_W=60;
-const NEXUS_HP=100, TOWER_HP=20;
-const TOWER_X_L=[250,520], TOWER_X_R=[950,680];
-const TOWER_RANGE=160, TOWER_CD=70;
-const TOWER_DMG_M=15, TOWER_DMG_P=20;
-const MINION_HP=30, MINION_SPD=0.8, MINION_RNG=45, MINION_CD=80;
-const WAVE_INT=1800, WAVE_SIZE=3;
-const FPS=60;
+const W = GAME_CONFIG.map.width;
+const H = GAME_CONFIG.map.height;
+const LANE_Y = GAME_CONFIG.lanes.yPositions;
+const LANE_H = GAME_CONFIG.lanes.height;
+const LANE_COUNT = GAME_CONFIG.lanes.count;
+const BASE_W = GAME_CONFIG.map.baseWidth;
+const NEXUS_HP = GAME_CONFIG.map.nexusHp;
+const TOWER_HP = GAME_CONFIG.towers.hp;
+const TOWER_X_L = GAME_CONFIG.lanes.towerX.L;
+const TOWER_X_R = GAME_CONFIG.lanes.towerX.R;
+const TOWER_RANGE = GAME_CONFIG.towers.range;
+const TOWER_CD = GAME_CONFIG.towers.cooldown;
+const TOWER_DMG_M = GAME_CONFIG.towers.damageMinion;
+const TOWER_DMG_P = GAME_CONFIG.towers.damagePlayer;
+const MINION_HP = GAME_CONFIG.minions.hp;
+const MINION_SPD = GAME_CONFIG.minions.speed;
+const MINION_RNG = GAME_CONFIG.minions.range;
+const MINION_CD = GAME_CONFIG.minions.attackCooldown;
+const MINION_DMG = GAME_CONFIG.minions.damage;
+const WAVE_INT = GAME_CONFIG.minions.waveInterval;
+const WAVE_SIZE = GAME_CONFIG.minions.waveSize;
+const FPS = 60;
 
 // ================================================================
-//  SOUND SYSTEM (Web Audio API — no library needed)
+//  SOUND SYSTEM (Web Audio API)
 // ================================================================
 let audioCtx=null;
 function getAudio(){
@@ -306,6 +414,23 @@ function playSound(type){
         o.frequency.setValueAtTime(660,now+.07);
         g.gain.setValueAtTime(.12,now); g.gain.exponentialRampToValueAtTime(.001,now+.18);
         o.start(now); o.stop(now+.18); break;
+      case 'essence':
+        o.type='sine'; o.frequency.setValueAtTime(660,now);
+        o.frequency.exponentialRampToValueAtTime(880,now+.1);
+        g.gain.setValueAtTime(.15,now); g.gain.exponentialRampToValueAtTime(.001,now+.15);
+        o.start(now); o.stop(now+.15); break;
+      case 'levelup':
+        o.type='square'; o.frequency.setValueAtTime(440,now);
+        o.frequency.setValueAtTime(554,now+.08);
+        o.frequency.setValueAtTime(659,now+.16);
+        o.frequency.setValueAtTime(880,now+.24);
+        g.gain.setValueAtTime(.2,now); g.gain.exponentialRampToValueAtTime(.001,now+.5);
+        o.start(now); o.stop(now+.5); break;
+      case 'shrine':
+        o.type='sine'; o.frequency.setValueAtTime(523,now);
+        o.frequency.exponentialRampToValueAtTime(1046,now+.2);
+        g.gain.setValueAtTime(.18,now); g.gain.exponentialRampToValueAtTime(.001,now+.3);
+        o.start(now); o.stop(now+.3); break;
     }
   }catch(e){}
 }
@@ -329,9 +454,21 @@ let selectedChar='';
 let G={};
 function freshG(){
   return {
-    players:{}, minions:[], towers:[], nexus:{L:{hp:NEXUS_HP,max:NEXUS_HP},R:{hp:NEXUS_HP,max:NEXUS_HP}},
-    projs:[], particles:[], floats:[],
-    wave:0, waveT:180, frame:0, phase:'playing', shake:0
+    players:{}, 
+    minions:[], 
+    towers:[], 
+    jungleCamps:[],
+    shrines:[],
+    essence:[],  // Dropped essence pickups
+    nexus:{L:{hp:NEXUS_HP,max:NEXUS_HP},R:{hp:NEXUS_HP,max:NEXUS_HP}},
+    projs:[], 
+    particles:[], 
+    floats:[],
+    wave:0, 
+    waveT:GAME_CONFIG.minions.waveInterval, 
+    frame:0, 
+    phase:'playing', 
+    shake:0
   };
 }
 
@@ -387,7 +524,6 @@ function createRoom(){
     const d=msg.data;
     opName=d.name;
     setLobbyStatus('⚔️ '+opName+' joined! Heading to character select…');
-    // Tell guest we received them
     channel.publish('joined',{hostName:myName, hostId:myId});
     setTimeout(()=>goCharSelect(),600);
   });
@@ -406,15 +542,12 @@ function joinRoom(){
 
   channel=ably.channels.get('lm:'+roomId);
 
-  // Wait for host to confirm
   channel.subscribe('joined',msg=>{
     opName=msg.data.hostName;
     setLobbyStatus('Joined! Going to character select…');
-    // Tell host our char later in char select
     setTimeout(()=>goCharSelect(),600);
   });
 
-  // Announce ourselves
   channel.publish('join',{name:myName, id:myId});
   setLobbyStatus('Connecting to room '+code+'…');
 }
@@ -430,7 +563,6 @@ function goCharSelect(){
   buildCharGrid();
   showScreen('charselect');
 
-  // Listen for opponent's character lock
   channel.subscribe('char-lock',msg=>{
     if(msg.data.id!==myId){
       opChar=msg.data.char;
@@ -481,7 +613,6 @@ function tryStartGame(){
 //  GAME START
 // ================================================================
 function startGame(){
-  // Unsubscribe char-lock listener
   channel.unsubscribe('char-lock');
   channel.unsubscribe('join');
   channel.unsubscribe('joined');
@@ -498,6 +629,8 @@ function startGame(){
   G=freshG();
   initPlayers();
   initTowers();
+  initJungle();
+  initShrines();
   setupKeys();
   setupHUDLabels();
 
@@ -512,14 +645,14 @@ function startGame(){
 }
 
 function fitCanvas(){
-  const s=Math.min(window.innerWidth/W,(window.innerHeight-50)/H,1.3);
+  const maxWidth = window.innerWidth - 40;
+  const maxHeight = window.innerHeight - 70;
+  const s=Math.min(maxWidth/W, maxHeight/H, 1);
   canvas.style.width=(W*s)+'px';
   canvas.style.height=(H*s)+'px';
 }
 
 function initPlayers(){
-  // Host = left (blue), Guest = right (red)
-  // Both clients agree on team by role, not ID ordering
   const leftChar  = isHost ? myChar : opChar;
   const rightChar = isHost ? opChar : myChar;
   const leftName  = isHost ? myName : opName;
@@ -533,27 +666,85 @@ function initPlayers(){
 
 function makePlayer(id,charKey,team,name){
   const c=CHARS[charKey];
-  return{id,charKey,team,name,
-    x:team==='L'?110:W-110, y:LANE_Y[0], lane:0,
-    hp:c.stats.maxHp, maxHp:c.stats.maxHp,
-    speed:c.stats.speed, atk:c.stats.atk,
-    range:c.stats.range, atkCd:c.stats.cd,
-    atkT:0, laneT:0,
-    rageT:0, invis:0, evade:0, evadeT:0, slowT:0, stunT:0,
+  return{
+    id, charKey, team, name,
+    x:team==='L'?BASE_W+60:W-BASE_W-60, 
+    y:LANE_Y[1], 
+    lane:1,  // Start in middle lane
+    hp:c.stats.maxHp, 
+    maxHp:c.stats.maxHp,
+    speed:c.stats.speed, 
+    atk:c.stats.atk,
+    range:c.stats.range, 
+    atkCd:c.stats.cd,
+    atkT:0, 
+    laneT:0,
+    rageT:0, 
+    invis:0, 
+    evade:0, 
+    evadeT:0, 
+    slowT:0, 
+    stunT:0,
     facing:team==='L'?1:-1,
-    dead:false, respawnT:0, flash:0, flashCol:'#fff'};
+    dead:false, 
+    respawnT:0, 
+    flash:0, 
+    flashCol:'#fff',
+    // Leveling system
+    level:1,
+    essence:0,
+    essenceToNext:GAME_CONFIG.leveling.essencePerLevel[1],
+    baseStats:{...c.stats},  // Store base stats for scaling
+    // Buffs from shrines
+    speedBuff:0,
+    powerBuff:0
+  };
 }
 
 function initTowers(){
   G.towers=[];
-  for(let lane=0;lane<2;lane++){
+  for(let lane=0;lane<LANE_COUNT;lane++){
     ['L','R'].forEach(team=>{
-      const xs = team==='L' ? TOWER_X_L : TOWER_X_R;
+      const xs = team==='L' ? TOWER_X_L[lane] : TOWER_X_R[lane];
       xs.forEach((x,i)=>{
-        G.towers.push({id:`t${team}${lane}${i}`,team,lane,x,hp:TOWER_HP,maxHp:TOWER_HP,cd:0});
+        G.towers.push({id:`t${team}${lane}${i}`,team,lane,x,y:LANE_Y[lane],hp:TOWER_HP,maxHp:TOWER_HP,cd:0});
       });
     });
   }
+}
+
+function initJungle(){
+  G.jungleCamps=[];
+  if(!GAME_CONFIG.jungle.enabled) return;
+  
+  GAME_CONFIG.jungle.campPositions.forEach((pos, i)=>{
+    G.jungleCamps.push({
+      id:`camp${i}`,
+      x:pos[0],
+      y:pos[1],
+      hp:GAME_CONFIG.jungle.campHp,
+      maxHp:GAME_CONFIG.jungle.campHp,
+      cd:0,
+      respawnT:0,
+      active:true
+    });
+  });
+}
+
+function initShrines(){
+  G.shrines=[];
+  GAME_CONFIG.objectives.shrines.forEach((shrine, i)=>{
+    G.shrines.push({
+      id:`shrine${i}`,
+      x:shrine.x,
+      y:LANE_Y[shrine.lane],
+      lane:shrine.lane,
+      type:shrine.type,  // 'speed' or 'power'
+      active:true,
+      respawnT:0,
+      buffDuration:shrine.buffDuration
+    });
+  });
 }
 
 // ================================================================
@@ -563,7 +754,6 @@ function myPid(){ return isHost ? 'host' : 'guest'; }
 function opPid(){ return isHost ? 'guest' : 'host'; }
 
 function setupHostNet(){
-  // Receive guest inputs
   channel.subscribe('input',msg=>{
     const d=msg.data;
     const gp=G.players.guest;
@@ -582,7 +772,6 @@ function setupHostNet(){
 }
 
 function setupGuestNet(){
-  // Receive host's full game state
   channel.subscribe('state',msg=>{
     applyState(msg.data);
   });
@@ -591,7 +780,7 @@ function setupGuestNet(){
 let stateTimer=0;
 function broadcastState(){
   stateTimer++;
-  if(!isHost||stateTimer<3) return; // ~20fps
+  if(!isHost||stateTimer<3) return;
   stateTimer=0;
   channel.publish('state',{
     players:{
@@ -600,6 +789,9 @@ function broadcastState(){
     },
     minions: G.minions.map(m=>({id:m.id,x:m.x,lane:m.lane,hp:m.hp,maxHp:m.maxHp,team:m.team})),
     towers:  G.towers.map(t=>({id:t.id,x:t.x,lane:t.lane,hp:t.hp,team:t.team})),
+    jungleCamps: G.jungleCamps.map(c=>({id:c.id,x:c.x,y:c.y,hp:c.hp,active:c.active})),
+    shrines: G.shrines.map(s=>({id:s.id,x:s.x,y:s.y,active:s.active,type:s.type})),
+    essence: G.essence.map(e=>({id:e.id,x:e.x,y:e.y,value:e.value})),
     nexus:   G.nexus,
     wave:    G.wave,
     waveT:   G.waveT,
@@ -609,14 +801,18 @@ function broadcastState(){
 
 function pickPlayerState(p){
   if(!p) return null;
-  return{x:p.x,y:p.y,lane:p.lane,hp:p.hp,maxHp:p.maxHp,facing:p.facing,
-    dead:p.dead,invis:p.invis,rageT:p.rageT,charKey:p.charKey,name:p.name};
+  return{
+    x:p.x,y:p.y,lane:p.lane,hp:p.hp,maxHp:p.maxHp,facing:p.facing,
+    dead:p.dead,invis:p.invis,rageT:p.rageT,charKey:p.charKey,name:p.name,
+    level:p.level,essence:p.essence,essenceToNext:p.essenceToNext,
+    speedBuff:p.speedBuff,powerBuff:p.powerBuff
+  };
 }
 
 let inputTimer=0;
 function broadcastInput(){
   inputTimer++;
-  if(isHost||inputTimer<2) return; // ~30fps for movement
+  if(isHost||inputTimer<2) return;
   inputTimer=0;
   const p=G.players[myPid()];
   if(!p) return;
@@ -626,38 +822,37 @@ function broadcastInput(){
 function sendAction(type){
   const p=G.players[myPid()];
   if(!p) return;
-  // Execute locally immediately (client-side prediction for both host and guest)
   if(type==='atk'){ doAtk(p,G); playSound('atk'); }
   else if(type==='q'){ CHARS[p.charKey].q.fn(p,G); playSound('ability'); }
   else if(type==='e'){ CHARS[p.charKey].e.fn(p,G); playSound('ability'); }
-  // Guest also sends to host for authoritative processing
   if(!isHost) channel.publish('input',{type});
 }
 
 function applyState(data){
   if(isHost) return;
-  // Apply everything EXCEPT our own player's position (local prediction)
   const myPl = G.players[myPid()];
   G.minions = data.minions||[];
   G.minions.forEach(m=>{ m.y=LANE_Y[m.lane]; });
   G.towers = data.towers||G.towers;
-  G.towers.forEach(t=>{ /* keep existing y */ });
+  G.jungleCamps = data.jungleCamps||G.jungleCamps;
+  G.shrines = data.shrines||G.shrines;
+  G.essence = data.essence||[];
   if(data.nexus) G.nexus=data.nexus;
   G.wave=data.wave||0;
   G.waveT=data.waveT||0;
   G.phase=data.phase||'playing';
 
-  // Update host player
   if(data.players?.host && G.players.host){
     const hp=data.players.host;
     Object.assign(G.players.host,hp);
-    G.players.host.y=LANE_Y[G.players.host.lane||0];
+    G.players.host.y=LANE_Y[G.players.host.lane||1];
   }
-  // Update our own HP from authoritative state (but keep our x/y)
   if(data.players?.[myPid()] && myPl){
     const ap=data.players[myPid()];
     myPl.hp=ap.hp; myPl.maxHp=ap.maxHp; myPl.dead=ap.dead;
     myPl.invis=ap.invis; myPl.rageT=ap.rageT;
+    myPl.level=ap.level; myPl.essence=ap.essence; myPl.essenceToNext=ap.essenceToNext;
+    myPl.speedBuff=ap.speedBuff; myPl.powerBuff=ap.powerBuff;
   }
   if(data.phase!=='playing') showWin(data.phase);
 }
@@ -669,19 +864,18 @@ function loop(){
   animId=requestAnimationFrame(loop);
   G.frame++;
 
-  // Tick local cooldowns
   if(cdAtk>0) cdAtk--;
   if(cdQ>0) cdQ--;
   if(cdE>0) cdE--;
 
-  // Handle input
   handleMovement();
   handleActionKeys();
+  handleEssencePickup();
+  handleShrineCapture();
 
   if(isHost) hostTick();
   tickParticles();
 
-  // Networking
   broadcastState();
   broadcastInput();
 
@@ -698,7 +892,6 @@ function setupKeys(){
       keys[e.code]=true;
       onKeyPress(e.code);
     }
-    // Prevent arrow key scrolling
     if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
   });
   document.addEventListener('keyup',e=>{ keys[e.code]=false; });
@@ -724,20 +917,140 @@ function handleMovement(){
   if(!p||p.dead||G.phase!=='playing') return;
   if(p.stunT>0){ p.stunT--; return; }
 
-  const spd=p.speed*(p.slowT>0?.5:1)*(p.rageT>0?1.2:1);
+  const speedMult = (p.slowT>0?.5:1) * (p.rageT>0?1.2:1) * (p.speedBuff>0?1.3:1);
+  const spd=p.speed*speedMult;
+  
   if(keys['KeyA']||keys['ArrowLeft'])  { p.x-=spd; p.facing=-1; }
   if(keys['KeyD']||keys['ArrowRight']) { p.x+=spd; p.facing=1;  }
   p.x=Math.max(20,Math.min(W-20,p.x));
 
-  // Lane switch
-  if((keys['KeyW']||keys['ArrowUp'])&&p.laneT<=0&&p.lane>0){ p.lane--; p.laneT=20; }
-  if((keys['KeyS']||keys['ArrowDown'])&&p.laneT<=0&&p.lane<1){ p.lane++; p.laneT=20; }
+  // Lane switch (now 3 lanes)
+  if((keys['KeyW']||keys['ArrowUp'])&&p.laneT<=0&&p.lane>0){ p.lane--; p.laneT=15; }
+  if((keys['KeyS']||keys['ArrowDown'])&&p.laneT<=0&&p.lane<LANE_COUNT-1){ p.lane++; p.laneT=15; }
   if(p.laneT>0) p.laneT--;
   p.y=LANE_Y[p.lane];
+  
+  // Allow moving in jungle (between lanes)
+  if(GAME_CONFIG.jungle.enabled){
+    // Can move freely in x, but y is constrained to lanes or jungle paths
+    const jungleYMin = Math.min(...LANE_Y) - 50;
+    const jungleYMax = Math.max(...LANE_Y) + 50;
+    if(p.y < jungleYMin) p.y = jungleYMin;
+    if(p.y > jungleYMax) p.y = jungleYMax;
+  }
 }
 
-function handleActionKeys(){
-  // Held-key cooldown ticks happen in main loop; press detection in onKeyPress
+function handleActionKeys(){}
+
+// ================================================================
+//  ESSENCE SYSTEM
+// ================================================================
+function handleEssencePickup(){
+  const p = G.players[myPid()];
+  if(!p || p.dead) return;
+  
+  for(let i = G.essence.length - 1; i >= 0; i--){
+    const e = G.essence[i];
+    const dist = Math.sqrt((p.x-e.x)**2 + (p.y-e.y)**2);
+    if(dist < 35){
+      // Pick up essence
+      addEssence(p, e.value);
+      G.essence.splice(i, 1);
+      playSound('essence');
+      particles(e.x, e.y, '#9b5de5', 6);
+    }
+  }
+}
+
+function addEssence(player, amount){
+  player.essence += amount;
+  float(player, `+${amount} ESSENCE`, '#9b5de5');
+  
+  // Check for level up
+  const cfg = GAME_CONFIG.leveling;
+  if(player.level < cfg.maxLevel && player.essence >= player.essenceToNext){
+    levelUp(player);
+  }
+}
+
+function levelUp(player){
+  player.level++;
+  const cfg = GAME_CONFIG.leveling;
+  
+  // Apply stat bonuses
+  player.maxHp += cfg.hpBonusPerLevel;
+  player.hp += cfg.hpBonusPerLevel;
+  player.atk += cfg.atkBonusPerLevel;
+  player.speed += cfg.speedBonusPerLevel;
+  
+  // Set next level requirement
+  if(player.level < cfg.maxLevel){
+    player.essenceToNext = cfg.essencePerLevel[player.level];
+  } else {
+    player.essenceToNext = 999999;
+  }
+  
+  playSound('levelup');
+  float(player, `LEVEL UP! ${player.level}`, '#f0b840');
+  G.shake = 5;
+}
+
+function dropEssence(x, y, value, team){
+  // Add some randomness to drop position
+  const offsetX = (Math.random() - 0.5) * 30;
+  const offsetY = (Math.random() - 0.5) * 20;
+  G.essence.push({
+    id: 'e' + (minionId++),
+    x: x + offsetX,
+    y: y + offsetY,
+    value: value,
+    team: team,
+    life: 1800  // Disappears after 30 seconds
+  });
+}
+
+// ================================================================
+//  SHRINE SYSTEM
+// ================================================================
+function handleShrineCapture(){
+  if(!isHost) return;
+  
+  for(const shrine of G.shrines){
+    if(!shrine.active){
+      shrine.respawnT--;
+      if(shrine.respawnT <= 0){
+        shrine.active = true;
+      }
+      continue;
+    }
+    
+    // Check if any player is near
+    for(const p of Object.values(G.players)){
+      if(p.dead) continue;
+      const dist = Math.sqrt((p.x-shrine.x)**2 + (p.y-shrine.y)**2);
+      if(dist < 50){
+        // Activate shrine buff
+        activateShrine(shrine, p);
+        break;
+      }
+    }
+  }
+}
+
+function activateShrine(shrine, player){
+  shrine.active = false;
+  shrine.respawnT = GAME_CONFIG.objectives.respawnTime;
+  
+  if(shrine.type === 'speed'){
+    player.speedBuff = shrine.buffDuration;
+    float(player, 'SPEED BOOST!', '#4af');
+  } else if(shrine.type === 'power'){
+    player.powerBuff = shrine.buffDuration;
+    float(player, 'POWER BOOST!', '#f44');
+  }
+  
+  playSound('shrine');
+  particles(shrine.x, shrine.y, '#f0b840', 15);
 }
 
 // ================================================================
@@ -752,12 +1065,19 @@ function hostTick(){
     if(p.slowT>0) p.slowT--;
     if(p.stunT>0) p.stunT--;
     if(p.flash>0) p.flash--;
-    // Respawn
+    if(p.speedBuff>0) p.speedBuff--;
+    if(p.powerBuff>0) p.powerBuff--;
+    
+    // Respawn with scaling death timer
     if(p.dead){
       p.respawnT--;
       if(p.respawnT<=0){
-        p.dead=false; p.hp=p.maxHp;
-        p.x=p.team==='L'?110:W-110; p.lane=0; p.y=LANE_Y[0];
+        p.dead=false; 
+        p.hp=p.maxHp;
+        p.x=p.team==='L'?BASE_W+60:W-BASE_W-60; 
+        p.lane=1; 
+        p.y=LANE_Y[1];
+        p.flash=GAME_CONFIG.player.respawnInvulnerability;
         float(p,'RESPAWN','#2ecc71');
       }
     }
@@ -765,21 +1085,37 @@ function hostTick(){
 
   // Wave
   G.waveT--;
-  if(G.waveT<=0){ G.waveT=WAVE_INT; G.wave++; spawnWave(); playSound('wave'); }
+  if(G.waveT<=0){ 
+    G.waveT=WAVE_INT; 
+    G.wave++; 
+    spawnWave(); 
+    playSound('wave'); 
+  }
 
   tickMinions();
   tickTowers();
+  tickJungleCamps();
   tickProjs();
+  tickEssence();
   checkNexus();
   checkWin();
+}
+
+function tickEssence(){
+  for(let i = G.essence.length - 1; i >= 0; i--){
+    G.essence[i].life--;
+    if(G.essence[i].life <= 0){
+      G.essence.splice(i, 1);
+    }
+  }
 }
 
 // ================================================================
 //  WAVES & MINIONS
 // ================================================================
 function spawnWave(){
-  for(let lane=0;lane<2;lane++){
-    for(let i=0;i<WAVE_SIZE;i++){
+  for(let lane=0;lane<LANE_COUNT;lane++){
+    for(let i=0;i<GAME_CONFIG.minions.minionsPerWave;i++){
       G.minions.push(mkMinion('L',lane,i));
       G.minions.push(mkMinion('R',lane,i));
     }
@@ -787,9 +1123,12 @@ function spawnWave(){
 }
 
 function mkMinion(team,lane,off){
-  const x=team==='L'?BASE_W+12+off*22:W-BASE_W-12-off*22;
-  return{id:'m'+(minionId++),team,lane,x,y:LANE_Y[lane],
-    hp:MINION_HP,maxHp:MINION_HP,cd:0,facing:team==='L'?1:-1};
+  const x=team==='L'?BASE_W+20+off*25:W-BASE_W-20-off*25;
+  return{
+    id:'m'+(minionId++),
+    team,lane,x,y:LANE_Y[lane],
+    hp:MINION_HP,maxHp:MINION_HP,cd:0,facing:team==='L'?1:-1
+  };
 }
 
 function tickMinions(){
@@ -799,8 +1138,7 @@ function tickMinions(){
     const enemy=nearestAhead(m);
     if(enemy&&distX(m,enemy)<=MINION_RNG){
       m.cd=MINION_CD;
-      const dmg=MINION_HP/10; // 3 dmg
-      applyDmg(enemy,dmg);
+      applyDmg(enemy,MINION_DMG);
       particles(enemy.x,enemy.y,m.team==='L'?'#4af':'#f44',3);
     } else {
       m.x+=m.facing*MINION_SPD;
@@ -809,6 +1147,15 @@ function tickMinions(){
     if(m.team==='L'&&m.x>=W-BASE_W){ G.nexus.R.hp=Math.max(0,G.nexus.R.hp-5); m.hp=0; }
     if(m.team==='R'&&m.x<=BASE_W)   { G.nexus.L.hp=Math.max(0,G.nexus.L.hp-5); m.hp=0; }
   }
+  
+  // Check for dead minions and drop essence
+  for(let i = G.minions.length - 1; i >= 0; i--){
+    const m = G.minions[i];
+    if(m.hp <= 0 && Math.random() < GAME_CONFIG.minions.essenceDropChance){
+      dropEssence(m.x, m.y, GAME_CONFIG.minions.essenceDrop, m.team);
+    }
+  }
+  
   G.minions=G.minions.filter(m=>m.hp>0);
 }
 
@@ -826,7 +1173,6 @@ function nearestAhead(m){
   };
   G.minions.forEach(check);
   G.towers.forEach(check);
-  // Check nexus
   const nTeam=m.team==='L'?'R':'L';
   const nx=m.team==='L'?W-BASE_W+20:BASE_W-20;
   const ndef={hp:G.nexus[nTeam].hp,maxHp:G.nexus[nTeam].max,x:nx,y:m.y,team:nTeam,lane:m.lane,_nexus:nTeam};
@@ -837,6 +1183,48 @@ function nearestAhead(m){
 function distX(a,b){ return Math.abs(a.x-b.x); }
 
 // ================================================================
+//  JUNGLE CAMPS
+// ================================================================
+function tickJungleCamps(){
+  if(!GAME_CONFIG.jungle.enabled) return;
+  
+  for(const camp of G.jungleCamps){
+    if(!camp.active){
+      camp.respawnT--;
+      if(camp.respawnT <= 0){
+        camp.active = true;
+        camp.hp = camp.maxHp;
+      }
+      continue;
+    }
+    
+    // Jungle camps attack nearby enemies
+    if(camp.cd > 0){
+      camp.cd--;
+      continue;
+    }
+    
+    // Find nearest player to attack
+    let nearest = null;
+    let nearestDist = 120;
+    
+    for(const p of Object.values(G.players)){
+      const dist = Math.sqrt((p.x-camp.x)**2 + (p.y-camp.y)**2);
+      if(dist < nearestDist){
+        nearestDist = dist;
+        nearest = p;
+      }
+    }
+    
+    if(nearest){
+      camp.cd = 90;
+      applyDmg(nearest, GAME_CONFIG.jungle.campDamage);
+      particles(nearest.x, nearest.y, '#5a3a1a', 4);
+    }
+  }
+}
+
+// ================================================================
 //  TOWERS
 // ================================================================
 function tickTowers(){
@@ -844,13 +1232,11 @@ function tickTowers(){
     if(t.hp<=0) continue;
     if(t.cd>0){ t.cd--; continue; }
     let target=null, td=Infinity;
-    // Minions first
     for(const m of G.minions){
       if(m.team===t.team||m.lane!==t.lane) continue;
       const d=Math.abs(m.x-t.x);
       if(d<TOWER_RANGE&&d<td){ td=d; target=m; }
     }
-    // Then players
     if(!target){
       for(const p of Object.values(G.players)){
         if(p.team===t.team||p.dead||p.lane!==t.lane) continue;
@@ -864,7 +1250,6 @@ function tickTowers(){
       applyDmg(target,dmg);
       playSound('tower');
       particles(target.x,target.y,t.team==='L'?'#4af':'#f44',5);
-      // Visual bolt
       G.projs.push({x:t.x,y:LANE_Y[t.lane],tx:target.x,ty:target.y,
         color:t.team==='L'?'#4af':'#f44',life:8,maxLife:8,visual:true});
     }
@@ -877,7 +1262,8 @@ function tickTowers(){
 function doAtk(p,G){
   if(p.dead) return;
   const isRanged=p.range>80;
-  const dmg=p.atk*(p.rageT>0?2:1);
+  const powerMult = p.powerBuff > 0 ? 1.5 : 1;
+  const dmg=p.atk*(p.rageT>0?2:1)*powerMult;
   if(isRanged) shoot(p,G,dmg,0,7,CHARS[p.charKey].color);
   else meleeAbility(p,G,dmg,p.range);
   particles(p.x+p.facing*20,p.y,CHARS[p.charKey].color,5);
@@ -888,7 +1274,23 @@ function meleeAbility(p,G,dmg,range){
   for(const m of G.minions){ if(m.team!==p.team&&m.lane===p.lane&&Math.abs(m.x-hx)<range*.7) applyDmg(m,dmg); }
   for(const t of G.towers){ if(t.team!==p.team&&t.lane===p.lane&&t.hp>0&&Math.abs(t.x-hx)<range*.7) applyDmg(t,dmg); }
   for(const op of Object.values(G.players)){ if(op.id!==p.id&&op.team!==p.team&&!op.dead&&op.lane===p.lane&&Math.abs(op.x-hx)<range*.7) applyDmg(op,dmg); }
-  // Nexus hit
+  
+  // Hit jungle camps
+  for(const camp of G.jungleCamps){
+    if(camp.active && camp.hp > 0){
+      const dist = Math.sqrt((camp.x-hx)**2 + (camp.y-p.y)**2);
+      if(dist < range){
+        applyDmg(camp, dmg);
+        if(camp.hp <= 0){
+          // Camp defeated - drop essence
+          dropEssence(camp.x, camp.y, GAME_CONFIG.jungle.campEssence, null);
+          camp.active = false;
+          camp.respawnT = GAME_CONFIG.jungle.spawnInterval;
+        }
+      }
+    }
+  }
+  
   const nTeam=p.team==='L'?'R':'L';
   const nx=p.team==='L'?W-BASE_W+20:BASE_W-20;
   if(Math.abs(nx-hx)<range*1.2){ G.nexus[nTeam].hp=Math.max(0,G.nexus[nTeam].hp-dmg); float({x:nx,y:p.y},'-'+dmg,'#f44'); }
@@ -950,13 +1352,18 @@ function spawnSummon(p,G){
 
 function applyDmg(target,dmg){
   if(!target||target.hp===undefined) return;
-  // _nexus targets are handled specially
   if(target._nexus){ G.nexus[target._nexus].hp=Math.max(0,G.nexus[target._nexus].hp-dmg); return; }
   if(target.evade&&Math.random()<target.evade){ float(target,'DODGE','#fff'); return; }
   target.hp=Math.max(0,target.hp-dmg);
   float(target,'-'+Math.ceil(dmg),'#f88');
   playSound('hit');
-  if(target.hp<=0&&target.charKey){ target.dead=true; target.respawnT=300; playSound('death'); }
+  if(target.hp<=0&&target.charKey){ 
+    target.dead=true; 
+    // Scaling death timer based on level
+    const cfg = GAME_CONFIG.leveling;
+    target.respawnT = cfg.baseDeathTimer + (target.level - 1) * cfg.deathTimerPerLevel;
+    playSound('death'); 
+  }
 }
 
 // ================================================================
@@ -967,7 +1374,6 @@ function tickProjs(){
     pr.life--;
     if(pr.visual||pr.life<=0) continue;
     pr.x+=pr.vx; pr.y+=pr.vy;
-    // Hit check
     let hit=false;
     for(const m of G.minions){
       if(m.team===pr.team||m.lane!==pr.lane) continue;
@@ -1050,14 +1456,22 @@ function render(){
 
   // BG
   ctx.fillStyle='#04040d'; ctx.fillRect(0,0,W,H);
+  
+  // Draw jungle areas (between lanes)
+  if(GAME_CONFIG.jungle.enabled){
+    ctx.fillStyle='#0a0a15';
+    for(let i=0; i<LANE_COUNT-1; i++){
+      const yMid = (LANE_Y[i] + LANE_Y[i+1]) / 2;
+      ctx.fillRect(BASE_W, yMid - 40, W-BASE_W*2, 80);
+    }
+  }
 
   // Lanes
-  for(let lane=0;lane<2;lane++){
+  for(let lane=0;lane<LANE_COUNT;lane++){
     const ly=LANE_Y[lane];
     ctx.fillStyle='#080818'; ctx.fillRect(BASE_W,ly-LANE_H/2,W-BASE_W*2,LANE_H);
     ctx.strokeStyle='#131328'; ctx.lineWidth=1;
     ctx.strokeRect(BASE_W,ly-LANE_H/2,W-BASE_W*2,LANE_H);
-    // Lane road markings
     ctx.strokeStyle='#1a1a38'; ctx.setLineDash([20,30]); ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(BASE_W,ly); ctx.lineTo(W-BASE_W,ly); ctx.stroke();
     ctx.setLineDash([]);
@@ -1065,6 +1479,9 @@ function render(){
 
   drawNexus('L'); drawNexus('R');
   G.towers.forEach(t=>{ if(t.hp>0) drawTower(t); });
+  G.shrines.forEach(s=>drawShrine(s));
+  G.jungleCamps.forEach(c=>{ if(c.active) drawJungleCamp(c); });
+  G.essence.forEach(e=>drawEssence(e));
   G.minions.forEach(drawMinion);
   Object.values(G.players).forEach(p=>{ if(!p.dead) drawPlayer(p); });
   G.projs.forEach(drawProj);
@@ -1096,34 +1513,111 @@ function drawNexus(side){
   const bc=side==='L'?'#3a6fff':'#ff3a3a';
   ctx.fillStyle=tc; ctx.fillRect(x,0,BASE_W,H);
   ctx.strokeStyle=bc; ctx.lineWidth=2; ctx.strokeRect(x,0,BASE_W,H);
-  ctx.fillStyle=bc; ctx.font='7px Press Start 2P,monospace'; ctx.textAlign='center';
-  ctx.fillText('NEXUS',x+BASE_W/2,18);
-  const bw=BASE_W-10, bh=7;
-  ctx.fillStyle='#0a0a1a'; ctx.fillRect(x+5,24,bw,bh);
+  ctx.fillStyle=bc; ctx.font='10px "Press Start 2P",monospace'; ctx.textAlign='center';
+  ctx.fillText('NEXUS',x+BASE_W/2,22);
+  const bw=BASE_W-14, bh=8;
+  ctx.fillStyle='#0a0a1a'; ctx.fillRect(x+7,28,bw,bh);
   const pct=n.hp/n.max;
   ctx.fillStyle=pct>.5?'#2ecc71':pct>.25?'#f0b840':'#e74c3c';
-  ctx.fillRect(x+5,24,bw*pct,bh);
-  ctx.fillStyle=bc; ctx.font='7px Share Tech Mono,monospace';
-  ctx.fillText(Math.ceil(n.hp)+'/'+n.max,x+BASE_W/2,44);
+  ctx.fillRect(x+7,28,bw*pct,bh);
+  ctx.fillStyle=bc; ctx.font='9px "Share Tech Mono",monospace';
+  ctx.fillText(Math.ceil(n.hp)+'/'+n.max,x+BASE_W/2,50);
 }
 
 function drawTower(t){
-  const x=t.x, y=LANE_Y[t.lane];
+  const x=t.x, y=t.y;
   const tc=t.team==='L'?'#1a3a7a':'#7a1a1a';
   const bc=t.team==='L'?'#3a7fff':'#ff3a3a';
   const tw=32, th=60;
   ctx.fillStyle=tc; ctx.fillRect(x-tw/2,y-th+6,tw,th);
   ctx.strokeStyle=bc; ctx.lineWidth=2; ctx.strokeRect(x-tw/2,y-th+6,tw,th);
-  // Battlements
   for(let i=0;i<3;i++){
     ctx.fillStyle=bc;
     ctx.fillRect(x-tw/2+i*(tw/3+.5),y-th+1,tw/3-1,7);
   }
-  // HP bar
   const bw=tw+6;
   ctx.fillStyle='#0a0a1a'; ctx.fillRect(x-bw/2,y-th,bw,4);
   ctx.fillStyle=t.hp>10?'#2ecc71':'#e74c3c';
   ctx.fillRect(x-bw/2,y-th,bw*(t.hp/t.maxHp),4);
+}
+
+function drawShrine(s){
+  if(!s.active) return;
+  const x=s.x, y=s.y;
+  const color = s.type === 'speed' ? '#4af' : '#f44';
+  const symbol = s.type === 'speed' ? '⚡' : '💪';
+  
+  // Pulsing glow
+  const pulse = Math.sin(G.frame * 0.1) * 5 + 10;
+  ctx.shadowBlur = pulse;
+  ctx.shadowColor = color;
+  
+  ctx.fillStyle = color + '44';
+  ctx.beginPath();
+  ctx.arc(x, y, 25, 0, Math.PI*2);
+  ctx.fill();
+  
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  
+  // Symbol
+  ctx.font = '16px serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = color;
+  ctx.fillText(symbol, x, y + 5);
+}
+
+function drawJungleCamp(c){
+  const x=c.x, y=c.y;
+  
+  // Draw camp as a dark creature
+  ctx.fillStyle = '#3a2a1a';
+  ctx.beginPath();
+  ctx.arc(x, y, 18, 0, Math.PI*2);
+  ctx.fill();
+  
+  ctx.strokeStyle = '#5a4a2a';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  
+  // Eyes
+  ctx.fillStyle = '#ff4400';
+  ctx.fillRect(x-6, y-4, 4, 4);
+  ctx.fillRect(x+2, y-4, 4, 4);
+  
+  // HP bar
+  const bw = 30;
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(x-bw/2, y-28, bw, 4);
+  ctx.fillStyle = c.hp > c.maxHp/2 ? '#2ecc71' : '#e74c3c';
+  ctx.fillRect(x-bw/2, y-28, bw*(c.hp/c.maxHp), 4);
+}
+
+function drawEssence(e){
+  const pulse = Math.sin(G.frame * 0.15 + e.id.charCodeAt(1)) * 3;
+  const size = 8 + pulse;
+  
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = '#9b5de5';
+  
+  ctx.fillStyle = '#9b5de5';
+  ctx.beginPath();
+  ctx.moveTo(e.x, e.y - size);
+  ctx.lineTo(e.x + size*0.7, e.y);
+  ctx.lineTo(e.x, e.y + size);
+  ctx.lineTo(e.x - size*0.7, e.y);
+  ctx.closePath();
+  ctx.fill();
+  
+  ctx.shadowBlur = 0;
+  
+  // Value text
+  ctx.font = '9px "Share Tech Mono",monospace';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#f0b840';
+  ctx.fillText(e.value, e.x, e.y - size - 4);
 }
 
 function drawMinion(m){
@@ -1139,6 +1633,13 @@ function drawMinion(m){
   const bw=w+4;
   ctx.fillStyle='#0a0a1a'; ctx.fillRect(x-bw/2,y-h-2,bw,3);
   ctx.fillStyle=tc; ctx.fillRect(x-bw/2,y-h-2,bw*(m.hp/m.maxHp),3);
+  const mf=m.facing, maw=7, mah=4;
+  const max2=x+mf*10, may=y+6;
+  ctx.fillStyle=bc;
+  ctx.beginPath();
+  if(mf===1){ ctx.moveTo(max2-maw/2,may-mah/2); ctx.lineTo(max2+maw/2,may); ctx.lineTo(max2-maw/2,may+mah/2); }
+  else { ctx.moveTo(max2+maw/2,may-mah/2); ctx.lineTo(max2-maw/2,may); ctx.lineTo(max2+maw/2,may+mah/2); }
+  ctx.closePath(); ctx.fill();
 }
 
 function drawPlayer(p){
@@ -1149,12 +1650,10 @@ function drawPlayer(p){
   const bc=p.team==='L'?'#4a80ff':'#ff4a4a';
 
   ctx.save();
-  // Invisible dimming
   if(p.invis>0){
     ctx.globalAlpha = (p.team===G.players[myPid()]?.team) ? .35 : .1;
   }
 
-  // Shape
   const col=p.flash>0?p.flashCol:ch.color;
   ctx.fillStyle=col+'cc';
   ctx.strokeStyle=isMe?'#ffffff':bc; ctx.lineWidth=2;
@@ -1179,13 +1678,11 @@ function drawPlayer(p){
       ctx.fillRect(x-w/2,y-h+4,w,h); ctx.strokeRect(x-w/2,y-h+4,w,h);
   }
 
-  // Emoji
   ctx.font='13px serif'; ctx.textAlign='center'; ctx.globalAlpha=Math.max(ctx.globalAlpha,.4);
-  ctx.fillStyle='white'; // reset for text
+  ctx.fillStyle='white';
   ctx.fillText(ch.emoji,x,y-h/2+8);
 
   // HP bar
-  const bw=w+12;
   ctx.globalAlpha=1;
   ctx.fillStyle='#0a0a1a'; ctx.fillRect(x-bw/2,y-h,bw,5);
   const pct=p.hp/p.maxHp;
@@ -1194,13 +1691,20 @@ function drawPlayer(p){
 
   // Name
   ctx.fillStyle=isMe?'#ffffff':bc;
-  ctx.font='8px Share Tech Mono,monospace'; ctx.textAlign='center';
+  ctx.font='8px "Share Tech Mono",monospace'; ctx.textAlign='center';
   ctx.fillText(p.name||p.charKey,x,y-h-7);
 
-  // Status icons
-  if(p.rageT>0){ ctx.font='10px serif'; ctx.fillText('💢',x+16,y-h+12); }
-  if(p.invis>0){ ctx.font='10px serif'; ctx.fillText('👁',x-16,y-h+12); }
-  if(p.stunT>0){ ctx.font='10px serif'; ctx.fillText('⭐',x,y-h+12); }
+  // Level indicator
+  ctx.fillStyle='#f0b840';
+  ctx.font='7px "Share Tech Mono",monospace';
+  ctx.fillText('Lv'+p.level,x,y+h+10);
+
+  // Buff indicators
+  if(p.speedBuff>0){ ctx.font='10px serif'; ctx.textAlign='center'; ctx.fillText('⚡',x+20,y-h+12); }
+  if(p.powerBuff>0){ ctx.font='10px serif'; ctx.textAlign='center'; ctx.fillText('💪',x-20,y-h+12); }
+  if(p.rageT>0){ ctx.font='10px serif'; ctx.textAlign='center'; ctx.fillText('💢',x+16,y-h+12); }
+  if(p.invis>0){ ctx.font='10px serif'; ctx.textAlign='center'; ctx.fillText('👁',x-16,y-h+12); }
+  if(p.stunT>0){ ctx.font='10px serif'; ctx.textAlign='center'; ctx.fillText('⭐',x,y-h+12); }
 
   ctx.restore();
 }
@@ -1208,7 +1712,6 @@ function drawPlayer(p){
 function drawProj(pr){
   if(pr.life<=0) return;
   if(pr.visual){
-    // Tower bolt: draw line from pr.x/y to pr.tx/ty, fading
     const alpha=pr.life/pr.maxLife;
     ctx.save(); ctx.globalAlpha=alpha; ctx.strokeStyle=pr.color; ctx.lineWidth=2;
     ctx.beginPath(); ctx.moveTo(pr.x,pr.y); ctx.lineTo(pr.tx,pr.ty); ctx.stroke();
@@ -1244,15 +1747,26 @@ function updateHUD(){
   if(me){
     document.getElementById('hl-hp').style.width=(me.hp/me.maxHp*100)+'%';
     document.getElementById('hl-hpn').textContent=Math.max(0,Math.ceil(me.hp))+'/'+me.maxHp;
+    
+    // Level and essence
+    document.getElementById('level-num').textContent = me.level;
+    const essencePct = me.level < GAME_CONFIG.leveling.maxLevel 
+      ? (me.essence / me.essenceToNext * 100) 
+      : 100;
+    document.getElementById('essence-fill').style.width = essencePct + '%';
+    
+    // Death timer warning
+    const deathTimer = GAME_CONFIG.leveling.baseDeathTimer + (me.level - 1) * GAME_CONFIG.leveling.deathTimerPerLevel;
+    const deathSeconds = Math.ceil(deathTimer / 60);
+    document.getElementById('death-num').textContent = deathSeconds;
+    document.getElementById('death-timer').style.opacity = me.level > 1 ? 1 : 0.3;
   }
   if(op){
     document.getElementById('hr-hp').style.width=(op.hp/op.maxHp*100)+'%';
     document.getElementById('hr-hpn').textContent=Math.max(0,Math.ceil(op.hp))+'/'+op.maxHp;
   }
-  // Cooldowns
   setCoolUI('c-atk',cdAtk,me?.atkCd||45);
   if(me){ setCoolUI('c-ab1',cdQ,CHARS[me.charKey].q.cd); setCoolUI('c-ab2',cdE,CHARS[me.charKey].e.cd); }
-  // Wave
   const secs=Math.ceil((G.waveT||0)/FPS);
   document.getElementById('hud-wave').textContent=`Wave ${G.wave} · next in ${secs}s`;
 }
